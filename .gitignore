@@ -1,23 +1,22 @@
-.env
-.env.*
-!.env.example
+# Python
 __pycache__/
 *.py[cod]
-.venv/
+*.pyo
+*.pyd
+
+# Virtual Environment
 venv/
-node_modules/
+.venv/
+
+# Environment Variables
+.env
+
+# VS Code
+.vscode/
+
+# Operating System
+Thumbs.db
 .DS_Store
-.idea/
-.vscode/settings.json
-*.log
-coverage/
-dist/
-build/
-tmp/
-temp/
-03_data_and_resources/raw_private/
-07_models_and_artifacts/binaries/
-*.pem
-*.key
-*credentials*.json
-*service-account*.json
+
+# Python cache
+.pytest_cache/
