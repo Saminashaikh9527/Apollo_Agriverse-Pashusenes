@@ -1,0 +1,13 @@
+
+path: .
+
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: cow
+  1: buffalo
+  2: goat
+  3: sheep
+  4: chicken
