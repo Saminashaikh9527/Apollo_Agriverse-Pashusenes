@@ -9,11 +9,11 @@ import {
   Typography
 } from "@mui/material";
 
-
 import {
   Dashboard,
   Agriculture,
   Pets,
+  AccountTree,
   Grass,
   LocalDrink,
   Egg,
@@ -24,137 +24,133 @@ import {
   Settings
 } from "@mui/icons-material";
 
-
 import { Link } from "react-router-dom";
-
 
 const menuItems = [
   {
-    name:"Dashboard",
-    path:"/dashboard",
-    icon:<Dashboard/>
+    name: "Dashboard",
+    path: "/dashboard",
+    icon: <Dashboard />
   },
   {
-    name:"Farms",
-    path:"/farms",
-    icon:<Agriculture/>
+    name: "Farms",
+    path: "/farms",
+    icon: <Agriculture />
   },
   {
-    name:"Animals",
-    path:"/animals",
-    icon:<Pets/>
+    name: "Animals",
+    path: "/animals",
+    icon: <Pets />
   },
   {
-    name:"Feed",
-    path:"/feed",
-    icon:<Grass/>
+    name: "Digital Twin",
+    path: "/digital-twin",
+    icon: <AccountTree />
   },
   {
-    name:"Milk",
-    path:"/milk",
-    icon:<LocalDrink/>
+    name: "Feed",
+    path: "/feed",
+    icon: <Grass />
   },
   {
-    name:"Eggs",
-    path:"/eggs",
-    icon:<Egg/>
+    name: "Milk",
+    path: "/milk",
+    icon: <LocalDrink />
   },
   {
-    name:"Wool",
-    path:"/wool",
-    icon:<ContentCut/>
+    name: "Eggs",
+    path: "/eggs",
+    icon: <Egg />
   },
   {
-    name:"Reports",
-    path:"/reports",
-    icon:<Assessment/>
+    name: "Wool",
+    path: "/wool",
+    icon: <ContentCut />
   },
   {
-    name:"AI Monitoring",
-    path:"/ai-monitoring",
-    icon:<SmartToy/>
+    name: "Reports",
+    path: "/reports",
+    icon: <Assessment />
   },
   {
-    name:"Predictions",
-    path:"/predictions",
-    icon:<Psychology/>
+    name: "AI Monitoring",
+    path: "/ai-monitoring",
+    icon: <SmartToy />
   },
   {
-    name:"Settings",
-    path:"/settings",
-    icon:<Settings/>
+    name: "Predictions",
+    path: "/predictions",
+    icon: <Psychology />
+  },
+  {
+    name: "Settings",
+    path: "/settings",
+    icon: <Settings />
   }
 ];
 
-
-export default function Sidebar(){
-
+export default function Sidebar() {
   return (
-
     <Drawer
       variant="permanent"
       sx={{
-        width:250,
+        width: 250,
 
-        "& .MuiDrawer-paper":{
-          width:250,
-          backgroundColor:"#1b5e20",
-          color:"white"
+        "& .MuiDrawer-paper": {
+          width: 250,
+          backgroundColor: "#1b5e20",
+          color: "white",
+          boxSizing: "border-box"
         }
       }}
     >
-
+      {/* Logo */}
       <Toolbar>
-
         <Typography
           variant="h6"
           fontWeight="bold"
+          sx={{
+            fontSize: "20px"
+          }}
         >
           🌱 AgroLens PLF
         </Typography>
-
       </Toolbar>
 
-
+      {/* Navigation */}
       <List>
+        {menuItems.map((item) => (
+          <ListItem
+            key={item.name}
+            disablePadding
+          >
+            <ListItemButton
+              component={Link}
+              to={item.path}
+              sx={{
+                color: "white",
 
-        {
-          menuItems.map((item)=>(
-
-            <ListItem
-              key={item.name}
-              disablePadding
+                "&:hover": {
+                  backgroundColor: "#2e7d32"
+                }
+              }}
             >
-
-              <ListItemButton
-                component={Link}
-                to={item.path}
+              <ListItemIcon
+                sx={{
+                  color: "white",
+                  minWidth: 40
+                }}
               >
+                {item.icon}
+              </ListItemIcon>
 
-                <ListItemIcon
-                  sx={{
-                    color:"white"
-                  }}
-                >
-                  {item.icon}
-                </ListItemIcon>
-
-
-                <ListItemText
-                  primary={item.name}
-                />
-
-              </ListItemButton>
-
-            </ListItem>
-
-          ))
-        }
-
+              <ListItemText
+                primary={item.name}
+              />
+            </ListItemButton>
+          </ListItem>
+        ))}
       </List>
-
-
     </Drawer>
-
   );
 }
