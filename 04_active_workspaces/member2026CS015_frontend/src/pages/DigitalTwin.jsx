@@ -1,553 +1,1506 @@
-import React, { useState } from "react";
+import { useState } from "react";
+
 import {
   Box,
+  Typography,
   Card,
   CardContent,
-  Typography,
   Grid,
-  Tabs,
-  Tab,
+  Avatar,
   Chip,
+  Button,
+  TextField,
+  MenuItem,
+  LinearProgress,
   Divider,
-  List,
-  ListItem,
-  ListItemText,
+  Stack,
+  Alert,
 } from "@mui/material";
 
-function DigitalTwin() {
-  const [tab, setTab] = useState(0);
+import {
+  Pets,
+  Favorite,
+  MonitorHeart,
+  Thermostat,
+  LocalDrink,
+  Restaurant,
+  DirectionsWalk,
+  AccessTime,
+  Warning,
+  CheckCircle,
+  TrendingUp,
+  CameraAlt,
+  Science,
+  Vaccines,
+} from "@mui/icons-material";
 
-  const animal = {
-    id: "Cow001",
-    tag: "AGRO-001",
+import { useSearchParams } from "react-router-dom";
+
+
+/* =========================================================
+   DIGITAL TWIN DEMO DATA
+
+   Later replace this with data from FastAPI.
+========================================================= */
+
+const animals = [
+  {
+    tag: "COW001",
+    name: "Lakshmi",
+    species: "Cow",
+    breed: "Gir",
+    age: "4 years",
+    gender: "Female",
+    emoji: "🐄",
+
+    health: "Healthy",
+    healthScore: 94,
+
+    temperature: 38.5,
+    heartRate: 72,
+
+    activity: 88,
+    eating: 82,
+    resting: 46,
+    walking: 74,
+
+    milk: 28,
+    feed: 9.2,
+
+    water: 42,
+
+    alert: "No abnormal behaviour detected",
+
+    vaccination: "Up to date",
+
+    lastSeen: "Just now",
+  },
+
+  {
+    tag: "COW002",
+    name: "Ganga",
     species: "Cow",
     breed: "Holstein",
-    age: "4 Years",
+    age: "3 years",
     gender: "Female",
-    weight: "420 kg",
-    farm: "Farm A",
-    health: "Healthy",
-    behaviour: "Eating",
-  };
+    emoji: "🐄",
 
-  const handleTabChange = (event, newValue) => {
-    setTab(newValue);
-  };
+    health: "Healthy",
+    healthScore: 97,
+
+    temperature: 38.4,
+    heartRate: 70,
+
+    activity: 92,
+    eating: 89,
+    resting: 40,
+    walking: 82,
+
+    milk: 31,
+    feed: 10.1,
+
+    water: 46,
+
+    alert: "Normal health pattern",
+
+    vaccination: "Up to date",
+
+    lastSeen: "Just now",
+  },
+
+  {
+    tag: "COW023",
+    name: "Kamadhenu",
+    species: "Cow",
+    breed: "Jersey",
+    age: "5 years",
+    gender: "Female",
+    emoji: "🐄",
+
+    health: "Attention",
+    healthScore: 68,
+
+    temperature: 39.4,
+    heartRate: 84,
+
+    activity: 58,
+    eating: 55,
+    resting: 71,
+    walking: 42,
+
+    milk: 19,
+    feed: 7.5,
+
+    water: 31,
+
+    alert: "Reduced activity detected",
+
+    vaccination: "Due in 12 days",
+
+    lastSeen: "2 min ago",
+  },
+
+  {
+    tag: "BUF001",
+    name: "Nandini",
+    species: "Buffalo",
+    breed: "Murrah",
+    age: "5 years",
+    gender: "Female",
+    emoji: "🐃",
+
+    health: "Healthy",
+    healthScore: 91,
+
+    temperature: 38.7,
+    heartRate: 68,
+
+    activity: 84,
+    eating: 80,
+    resting: 50,
+    walking: 71,
+
+    milk: 18,
+    feed: 11.2,
+
+    water: 51,
+
+    alert: "Normal health pattern",
+
+    vaccination: "Up to date",
+
+    lastSeen: "Just now",
+  },
+
+  {
+    tag: "GOAT001",
+    name: "Chikki",
+    species: "Goat",
+    breed: "Jamunapari",
+    age: "2 years",
+    gender: "Female",
+    emoji: "🐐",
+
+    health: "Healthy",
+    healthScore: 96,
+
+    temperature: 39.0,
+    heartRate: 82,
+
+    activity: 91,
+    eating: 86,
+    resting: 38,
+    walking: 88,
+
+    milk: 2,
+    feed: 2.1,
+
+    water: 8,
+
+    alert: "Normal health pattern",
+
+    vaccination: "Up to date",
+
+    lastSeen: "Just now",
+  },
+
+  {
+    tag: "SHE012",
+    name: "Moti",
+    species: "Sheep",
+    breed: "Deccani",
+    age: "3 years",
+    gender: "Male",
+    emoji: "🐑",
+
+    health: "High Risk",
+    healthScore: 41,
+
+    temperature: 40.1,
+    heartRate: 96,
+
+    activity: 35,
+    eating: 41,
+    resting: 82,
+    walking: 28,
+
+    milk: 0,
+    feed: 1.8,
+
+    water: 5,
+
+    alert: "High temperature + low activity",
+
+    vaccination: "Due",
+
+    lastSeen: "1 min ago",
+  },
+
+  {
+    tag: "HEN001",
+    name: "Ruby",
+    species: "Chicken",
+    breed: "Rhode Island",
+    age: "1 year",
+    gender: "Female",
+    emoji: "🐔",
+
+    health: "Healthy",
+    healthScore: 95,
+
+    temperature: 41.2,
+    heartRate: 280,
+
+    activity: 89,
+    eating: 84,
+    resting: 43,
+    walking: 77,
+
+    milk: 0,
+    feed: 0.12,
+
+    water: 0.25,
+
+    alert: "Normal health pattern",
+
+    vaccination: "Up to date",
+
+    lastSeen: "Just now",
+  },
+];
+
+
+/* =========================================================
+   MAIN DIGITAL TWIN
+========================================================= */
+
+export default function DigitalTwin() {
+  const [searchParams] =
+    useSearchParams();
+
+  const animalFromUrl =
+    searchParams.get("animal");
+
+  const [selectedTag, setSelectedTag] =
+    useState(
+      animalFromUrl || "COW001"
+    );
+
+
+  const animal =
+    animals.find(
+      (item) =>
+        item.tag === selectedTag
+    ) || animals[0];
+
 
   return (
-    <Box sx={{ padding: 3 }}>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        backgroundColor: "#f6faf8",
+        p: {
+          xs: 2,
+          sm: 3,
+          md: 4,
+        },
+      }}
+    >
 
-      {/* Page Title */}
-      <Typography variant="h4" fontWeight="bold" gutterBottom>
-        Animal Digital Twin
-      </Typography>
+      {/* =================================================
+          HEADER
+      ================================================== */}
 
-      <Typography variant="body1" color="text.secondary" mb={3}>
-        Complete digital profile and history of the animal
-      </Typography>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent:
+            "space-between",
 
-      {/* Animal Profile */}
-      <Card sx={{ mb: 3 }}>
+          alignItems: {
+            xs: "flex-start",
+            md: "center",
+          },
+
+          gap: 2,
+          flexWrap: "wrap",
+          mb: 3,
+        }}
+      >
+
+        <Box>
+
+          <Typography
+            variant="h4"
+            fontWeight={900}
+            color="#12372a"
+          >
+            Digital Twin 🧬
+          </Typography>
+
+          <Typography
+            color="text.secondary"
+            sx={{ mt: 0.5 }}
+          >
+            Real-time digital representation
+            of your livestock.
+          </Typography>
+
+        </Box>
+
+
+        {/* LIVE STATUS */}
+
+        <Chip
+          icon={
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                backgroundColor:
+                  "#22c55e",
+              }}
+            />
+          }
+          label="SYSTEM LIVE"
+          sx={{
+            fontWeight: 900,
+            color: "#166534",
+            backgroundColor:
+              "#dcfce7",
+            px: 1,
+          }}
+        />
+
+      </Box>
+
+
+      {/* =================================================
+          ANIMAL SELECTOR
+      ================================================== */}
+
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: 4,
+          border:
+            "1px solid #e5e7eb",
+          boxShadow: "none",
+        }}
+      >
+
         <CardContent>
-          <Grid container spacing={3} alignItems="center">
 
-            <Grid item xs={12} md={3}>
-              <Box
-                sx={{
-                  width: 130,
-                  height: 130,
-                  borderRadius: "50%",
-                  backgroundColor: "#e8f5e9",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 65,
-                  margin: "auto",
-                }}
+          <Grid
+            container
+            spacing={2}
+            alignItems="center"
+          >
+
+            <Grid
+              item
+              xs={12}
+              md={5}
+            >
+
+              <TextField
+                select
+                fullWidth
+                label="Select Animal"
+                value={selectedTag}
+                onChange={(e) =>
+                  setSelectedTag(
+                    e.target.value
+                  )
+                }
               >
-                🐄
-              </Box>
+
+                {animals.map(
+                  (item) => (
+                    <MenuItem
+                      key={item.tag}
+                      value={item.tag}
+                    >
+                      {item.emoji}{" "}
+                      {item.tag} —{" "}
+                      {item.name}
+                    </MenuItem>
+                  )
+                )}
+
+              </TextField>
+
             </Grid>
 
-            <Grid item xs={12} md={9}>
-              <Typography variant="h5" fontWeight="bold">
-                {animal.id}
-              </Typography>
 
-              <Typography color="text.secondary" mb={2}>
-                Tag Number: {animal.tag}
-              </Typography>
+            <Grid
+              item
+              xs={12}
+              md={7}
+            >
 
-              <Grid container spacing={2}>
-                <Grid item xs={6} md={3}>
-                  <Typography variant="caption">
-                    Species
-                  </Typography>
-                  <Typography fontWeight="bold">
-                    {animal.species}
-                  </Typography>
-                </Grid>
+              <Stack
+                direction="row"
+                spacing={1}
+                flexWrap="wrap"
+                useFlexGap
+              >
 
-                <Grid item xs={6} md={3}>
-                  <Typography variant="caption">
-                    Breed
-                  </Typography>
-                  <Typography fontWeight="bold">
-                    {animal.breed}
-                  </Typography>
-                </Grid>
+                {animals.map(
+                  (item) => (
+                    <Chip
+                      key={item.tag}
+                      label={
+                        `${item.emoji} ${item.tag}`
+                      }
+                      onClick={() =>
+                        setSelectedTag(
+                          item.tag
+                        )
+                      }
+                      variant={
+                        selectedTag ===
+                        item.tag
+                          ? "filled"
+                          : "outlined"
+                      }
+                      sx={{
+                        fontWeight: 700,
 
-                <Grid item xs={6} md={3}>
-                  <Typography variant="caption">
-                    Age
-                  </Typography>
-                  <Typography fontWeight="bold">
-                    {animal.age}
-                  </Typography>
-                </Grid>
+                        backgroundColor:
+                          selectedTag ===
+                          item.tag
+                            ? "#dcfce7"
+                            : "transparent",
 
-                <Grid item xs={6} md={3}>
-                  <Typography variant="caption">
-                    Weight
-                  </Typography>
-                  <Typography fontWeight="bold">
-                    {animal.weight}
-                  </Typography>
-                </Grid>
-              </Grid>
+                        color:
+                          selectedTag ===
+                          item.tag
+                            ? "#166534"
+                            : "inherit",
+                      }}
+                    />
+                  )
+                )}
 
-              <Box mt={2}>
-                <Chip
-                  label={`Health: ${animal.health}`}
-                  color="success"
-                  sx={{ mr: 1 }}
-                />
+              </Stack>
 
-                <Chip
-                  label={`Behaviour: ${animal.behaviour}`}
-                  color="primary"
-                />
-              </Box>
             </Grid>
 
           </Grid>
+
         </CardContent>
+
       </Card>
 
-      {/* Tabs */}
-      <Card>
-        <Tabs
-          value={tab}
-          onChange={handleTabChange}
-          variant="scrollable"
-          scrollButtons="auto"
-        >
-          <Tab label="Overview" />
-          <Tab label="Health" />
-          <Tab label="Production" />
-          <Tab label="Behaviour" />
-          <Tab label="Feed" />
-          <Tab label="Predictions" />
-          <Tab label="Timeline" />
-        </Tabs>
 
-        <Divider />
+      {/* =================================================
+          ANIMAL PROFILE
+      ================================================== */}
+
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: 4,
+          overflow: "hidden",
+          border:
+            "1px solid #e5e7eb",
+          boxShadow: "none",
+        }}
+      >
+
+        <Box
+          sx={{
+            background:
+              "linear-gradient(135deg, #064e3b, #059669)",
+            color: "white",
+            p: {
+              xs: 2.5,
+              md: 3.5,
+            },
+          }}
+        >
+
+          <Grid
+            container
+            spacing={3}
+            alignItems="center"
+          >
+
+            {/* ANIMAL */}
+
+            <Grid
+              item
+              xs={12}
+              md={4}
+            >
+
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems:
+                    "center",
+                  gap: 2,
+                }}
+              >
+
+                <Avatar
+                  sx={{
+                    width: 100,
+                    height: 100,
+                    fontSize: 58,
+                    backgroundColor:
+                      "rgba(255,255,255,0.15)",
+                    border:
+                      "3px solid rgba(255,255,255,0.3)",
+                  }}
+                >
+                  {animal.emoji}
+                </Avatar>
+
+                <Box>
+
+                  <Typography
+                    fontSize={13}
+                    sx={{
+                      opacity: 0.75,
+                    }}
+                  >
+                    DIGITAL TWIN
+                  </Typography>
+
+                  <Typography
+                    variant="h4"
+                    fontWeight={900}
+                  >
+                    {animal.tag}
+                  </Typography>
+
+                  <Typography>
+                    {animal.name} •{" "}
+                    {animal.breed}
+                  </Typography>
+
+                  <Chip
+                    label={
+                      animal.health
+                    }
+                    size="small"
+                    sx={{
+                      mt: 1,
+                      fontWeight: 800,
+                      backgroundColor:
+                        animal.health ===
+                        "Healthy"
+                          ? "#bbf7d0"
+                          : animal.health ===
+                            "Attention"
+                          ? "#fed7aa"
+                          : "#fecaca",
+
+                      color:
+                        animal.health ===
+                        "Healthy"
+                          ? "#166534"
+                          : animal.health ===
+                            "Attention"
+                          ? "#9a3412"
+                          : "#991b1b",
+                    }}
+                  />
+
+                </Box>
+
+              </Box>
+
+            </Grid>
+
+
+            {/* HEALTH SCORE */}
+
+            <Grid
+              item
+              xs={12}
+              md={4}
+            >
+
+              <Box
+                sx={{
+                  textAlign: "center",
+                }}
+              >
+
+                <Typography
+                  fontSize={13}
+                  sx={{
+                    opacity: 0.75,
+                  }}
+                >
+                  AI HEALTH SCORE
+                </Typography>
+
+                <Typography
+                  sx={{
+                    fontSize: 58,
+                    fontWeight: 900,
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {animal.healthScore}
+                </Typography>
+
+                <Typography>
+                  out of 100
+                </Typography>
+
+              </Box>
+
+            </Grid>
+
+
+            {/* LIVE */}
+
+            <Grid
+              item
+              xs={12}
+              md={4}
+            >
+
+              <Box>
+
+                <Chip
+                  label="● LIVE MONITORING"
+                  sx={{
+                    color: "white",
+                    backgroundColor:
+                      "rgba(255,255,255,0.15)",
+                    fontWeight: 800,
+                    mb: 2,
+                  }}
+                />
+
+                <Typography
+                  variant="body2"
+                  sx={{
+                    opacity: 0.8,
+                  }}
+                >
+                  Last detected
+                </Typography>
+
+                <Typography
+                  fontWeight={800}
+                >
+                  {animal.lastSeen}
+                </Typography>
+
+              </Box>
+
+            </Grid>
+
+          </Grid>
+
+        </Box>
+
+
+        {/* PROFILE INFO */}
 
         <CardContent>
 
-          {/* Overview */}
-          {tab === 0 && (
-            <Box>
-              <Typography variant="h6" fontWeight="bold" mb={2}>
-                Animal Overview
-              </Typography>
+          <Grid
+            container
+            spacing={2}
+          >
 
-              <Grid container spacing={3}>
+            <InfoBox
+              title="Species"
+              value={animal.species}
+              icon={<Pets />}
+            />
 
-                <Grid item xs={12} md={4}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography color="text.secondary">
-                        Farm
-                      </Typography>
-                      <Typography variant="h6">
-                        {animal.farm}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
+            <InfoBox
+              title="Breed"
+              value={animal.breed}
+              icon={<Science />}
+            />
 
-                <Grid item xs={12} md={4}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography color="text.secondary">
-                        Current Health
-                      </Typography>
-                      <Typography variant="h6">
-                        Healthy
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
+            <InfoBox
+              title="Age"
+              value={animal.age}
+              icon={<AccessTime />}
+            />
 
-                <Grid item xs={12} md={4}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography color="text.secondary">
-                        Current Behaviour
-                      </Typography>
-                      <Typography variant="h6">
-                        Eating
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
+            <InfoBox
+              title="Gender"
+              value={animal.gender}
+              icon={<Pets />}
+            />
 
-              </Grid>
-            </Box>
-          )}
-
-          {/* Health */}
-          {tab === 1 && (
-            <Box>
-              <Typography variant="h6" fontWeight="bold" mb={2}>
-                Health Information
-              </Typography>
-
-              <Grid container spacing={3}>
-
-                <Grid item xs={12} md={4}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography color="text.secondary">
-                        Health Status
-                      </Typography>
-                      <Typography variant="h6">
-                        Healthy
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                <Grid item xs={12} md={4}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography color="text.secondary">
-                        Temperature
-                      </Typography>
-                      <Typography variant="h6">
-                        38.5 °C
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                <Grid item xs={12} md={4}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography color="text.secondary">
-                        Heart Rate
-                      </Typography>
-                      <Typography variant="h6">
-                        72 bpm
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-              </Grid>
-
-              <Typography variant="h6" mt={4} mb={1}>
-                Health History
-              </Typography>
-
-              <List>
-                <ListItem>
-                  <ListItemText
-                    primary="07 Aug 2026"
-                    secondary="Healthy"
-                  />
-                </ListItem>
-
-                <ListItem>
-                  <ListItemText
-                    primary="05 Aug 2026"
-                    secondary="Minor health risk detected"
-                  />
-                </ListItem>
-
-                <ListItem>
-                  <ListItemText
-                    primary="01 Aug 2026"
-                    secondary="Healthy"
-                  />
-                </ListItem>
-              </List>
-            </Box>
-          )}
-
-          {/* Production */}
-          {tab === 2 && (
-            <Box>
-              <Typography variant="h6" fontWeight="bold" mb={2}>
-                Production History
-              </Typography>
-
-              <Grid container spacing={3}>
-
-                <Grid item xs={12} md={4}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography color="text.secondary">
-                        Today's Milk
-                      </Typography>
-                      <Typography variant="h5">
-                        12 L
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                <Grid item xs={12} md={4}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography color="text.secondary">
-                        Weekly Production
-                      </Typography>
-                      <Typography variant="h5">
-                        78 L
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                <Grid item xs={12} md={4}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography color="text.secondary">
-                        Monthly Production
-                      </Typography>
-                      <Typography variant="h5">
-                        320 L
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-              </Grid>
-            </Box>
-          )}
-
-          {/* Behaviour */}
-          {tab === 3 && (
-            <Box>
-              <Typography variant="h6" fontWeight="bold" mb={2}>
-                AI Behaviour Monitoring
-              </Typography>
-
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography variant="h5">
-                    🟢 Eating
-                  </Typography>
-
-                  <Typography mt={1}>
-                    Confidence: 96%
-                  </Typography>
-
-                  <Typography color="text.secondary" mt={1}>
-                    Last detected: 07 Aug 2026, 10:45 AM
-                  </Typography>
-                </CardContent>
-              </Card>
-
-              <Typography variant="h6" mt={4}>
-                Behaviour History
-              </Typography>
-
-              <List>
-                <ListItem>
-                  <ListItemText
-                    primary="10:45 AM"
-                    secondary="Eating"
-                  />
-                </ListItem>
-
-                <ListItem>
-                  <ListItemText
-                    primary="09:30 AM"
-                    secondary="Walking"
-                  />
-                </ListItem>
-
-                <ListItem>
-                  <ListItemText
-                    primary="08:15 AM"
-                    secondary="Drinking"
-                  />
-                </ListItem>
-              </List>
-            </Box>
-          )}
-
-          {/* Feed */}
-          {tab === 4 && (
-            <Box>
-              <Typography variant="h6" fontWeight="bold" mb={2}>
-                Feed Records
-              </Typography>
-
-              <List>
-                <ListItem>
-                  <ListItemText
-                    primary="Green Fodder"
-                    secondary="8 kg"
-                  />
-                </ListItem>
-
-                <ListItem>
-                  <ListItemText
-                    primary="Dry Fodder"
-                    secondary="4 kg"
-                  />
-                </ListItem>
-
-                <ListItem>
-                  <ListItemText
-                    primary="Concentrate"
-                    secondary="2 kg"
-                  />
-                </ListItem>
-              </List>
-
-              <Typography variant="h6" mt={2}>
-                Total Feed: 14 kg
-              </Typography>
-            </Box>
-          )}
-
-          {/* Predictions */}
-          {tab === 5 && (
-            <Box>
-              <Typography variant="h6" fontWeight="bold" mb={2}>
-                ML Predictions
-              </Typography>
-
-              <Grid container spacing={3}>
-
-                <Grid item xs={12} md={4}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography color="text.secondary">
-                        Tomorrow's Milk Prediction
-                      </Typography>
-                      <Typography variant="h5">
-                        12.8 L
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                <Grid item xs={12} md={4}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography color="text.secondary">
-                        Health Risk
-                      </Typography>
-                      <Typography variant="h5">
-                        Low Risk
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                <Grid item xs={12} md={4}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography color="text.secondary">
-                        Recommendation
-                      </Typography>
-                      <Typography>
-                        Increase protein-rich feed
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-              </Grid>
-            </Box>
-          )}
-
-          {/* Timeline */}
-          {tab === 6 && (
-            <Box>
-              <Typography variant="h6" fontWeight="bold" mb={3}>
-                Animal Timeline
-              </Typography>
-
-              <List>
-
-                <ListItem>
-                  <ListItemText
-                    primary="07 Aug 2026 — Health Alert"
-                    secondary="Health monitoring completed"
-                  />
-                </ListItem>
-
-                <Divider />
-
-                <ListItem>
-                  <ListItemText
-                    primary="06 Aug 2026 — Milk Production"
-                    secondary="12 L milk recorded"
-                  />
-                </ListItem>
-
-                <Divider />
-
-                <ListItem>
-                  <ListItemText
-                    primary="05 Aug 2026 — Vaccination"
-                    secondary="Vaccination completed"
-                  />
-                </ListItem>
-
-                <Divider />
-
-                <ListItem>
-                  <ListItemText
-                    primary="04 Aug 2026 — AI Behaviour"
-                    secondary="Eating detected with 96% confidence"
-                  />
-                </ListItem>
-
-                <Divider />
-
-                <ListItem>
-                  <ListItemText
-                    primary="03 Aug 2026 — Weight Update"
-                    secondary="Animal weight updated to 420 kg"
-                  />
-                </ListItem>
-
-                <Divider />
-
-                <ListItem>
-                  <ListItemText
-                    primary="01 Aug 2026 — Animal Registered"
-                    secondary="Cow001 registered in Farm A"
-                  />
-                </ListItem>
-
-              </List>
-            </Box>
-          )}
+          </Grid>
 
         </CardContent>
+
+      </Card>
+
+
+      {/* =================================================
+          ALERT
+      ================================================== */}
+
+      {animal.health !==
+        "Healthy" && (
+
+        <Alert
+          severity={
+            animal.health ===
+            "High Risk"
+              ? "error"
+              : "warning"
+          }
+          icon={<Warning />}
+          sx={{
+            mb: 3,
+            borderRadius: 3,
+            fontWeight: 700,
+          }}
+        >
+          AI Alert: {animal.alert}
+        </Alert>
+
+      )}
+
+
+      {/* =================================================
+          HEALTH METRICS
+      ================================================== */}
+
+      <Typography
+        variant="h6"
+        fontWeight={900}
+        sx={{ mb: 2 }}
+      >
+        Live Health Metrics
+      </Typography>
+
+
+      <Grid
+        container
+        spacing={2.5}
+        sx={{ mb: 4 }}
+      >
+
+        <MetricCard
+          title="Body Temperature"
+          value={`${animal.temperature}°C`}
+          subtitle="Normal range monitored"
+          icon={<Thermostat />}
+          color="#ef4444"
+          bg="#fee2e2"
+          progress={
+            animal.temperature >
+            39.5
+              ? 85
+              : 55
+          }
+        />
+
+
+        <MetricCard
+          title="Heart Rate"
+          value={`${animal.heartRate} BPM`}
+          subtitle="Live sensor reading"
+          icon={<MonitorHeart />}
+          color="#ec4899"
+          bg="#fce7f3"
+          progress={65}
+        />
+
+
+        <MetricCard
+          title="Activity"
+          value={`${animal.activity}%`}
+          subtitle="Movement level"
+          icon={<DirectionsWalk />}
+          color="#16a34a"
+          bg="#dcfce7"
+          progress={animal.activity}
+        />
+
+
+        <MetricCard
+          title="Water Intake"
+          value={`${animal.water} L`}
+          subtitle="Today's estimated intake"
+          icon={<LocalDrink />}
+          color="#2563eb"
+          bg="#dbeafe"
+          progress={72}
+        />
+
+      </Grid>
+
+
+      {/* =================================================
+          BEHAVIOUR + PRODUCTION
+      ================================================== */}
+
+      <Grid
+        container
+        spacing={2.5}
+      >
+
+        {/* BEHAVIOUR */}
+
+        <Grid
+          item
+          xs={12}
+          md={6}
+        >
+
+          <Card
+            sx={{
+              borderRadius: 4,
+              border:
+                "1px solid #e5e7eb",
+              boxShadow: "none",
+              height: "100%",
+            }}
+          >
+
+            <CardContent>
+
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent:
+                    "space-between",
+                  alignItems: "center",
+                  mb: 3,
+                }}
+              >
+
+                <Typography
+                  variant="h6"
+                  fontWeight={900}
+                >
+                  Behaviour Analysis
+                </Typography>
+
+                <Chip
+                  label="AI Vision"
+                  size="small"
+                  icon={<CameraAlt />}
+                />
+
+              </Box>
+
+
+              <BehaviourBar
+                label="Eating"
+                value={animal.eating}
+              />
+
+              <BehaviourBar
+                label="Walking"
+                value={animal.walking}
+              />
+
+              <BehaviourBar
+                label="Resting"
+                value={animal.resting}
+              />
+
+              <BehaviourBar
+                label="Overall Activity"
+                value={animal.activity}
+              />
+
+
+              <Box
+                sx={{
+                  mt: 3,
+                  p: 2,
+                  borderRadius: 3,
+                  backgroundColor:
+                    "#f0fdf4",
+                }}
+              >
+
+                <Box
+                  sx={{
+                    display: "flex",
+                    gap: 1,
+                    alignItems:
+                      "center",
+                  }}
+                >
+
+                  <CheckCircle
+                    sx={{
+                      color:
+                        "#16a34a",
+                    }}
+                  />
+
+                  <Typography
+                    fontWeight={800}
+                  >
+                    AI Behaviour Status
+                  </Typography>
+
+                </Box>
+
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 0.5 }}
+                >
+                  {animal.alert}
+                </Typography>
+
+              </Box>
+
+            </CardContent>
+
+          </Card>
+
+        </Grid>
+
+
+        {/* PRODUCTION */}
+
+        <Grid
+          item
+          xs={12}
+          md={6}
+        >
+
+          <Card
+            sx={{
+              borderRadius: 4,
+              border:
+                "1px solid #e5e7eb",
+              boxShadow: "none",
+              height: "100%",
+            }}
+          >
+
+            <CardContent>
+
+              <Typography
+                variant="h6"
+                fontWeight={900}
+                sx={{ mb: 3 }}
+              >
+                Production & Consumption
+              </Typography>
+
+
+              <ProductionRow
+                icon={<LocalDrink />}
+                title="Milk Production"
+                value={
+                  animal.milk === 0
+                    ? "N/A"
+                    : `${animal.milk} L`
+                }
+                color="#2563eb"
+              />
+
+
+              <ProductionRow
+                icon={<Restaurant />}
+                title="Feed Consumption"
+                value={`${animal.feed} kg`}
+                color="#84cc16"
+              />
+
+
+              <ProductionRow
+                icon={<LocalDrink />}
+                title="Water Intake"
+                value={`${animal.water} L`}
+                color="#06b6d4"
+              />
+
+
+              <ProductionRow
+                icon={<Vaccines />}
+                title="Vaccination"
+                value={animal.vaccination}
+                color="#8b5cf6"
+              />
+
+
+              <Divider
+                sx={{ my: 2 }}
+              />
+
+
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  backgroundColor:
+                    "#eff6ff",
+                }}
+              >
+
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                >
+                  AI PRODUCTION INSIGHT
+                </Typography>
+
+                <Typography
+                  fontWeight={800}
+                  sx={{ mt: 0.5 }}
+                >
+                  {animal.milk > 20
+                    ? "Production is currently performing within the expected range."
+                    : "Production is below the expected range. Increased monitoring is recommended."}
+                </Typography>
+
+              </Box>
+
+            </CardContent>
+
+          </Card>
+
+        </Grid>
+
+      </Grid>
+
+
+      {/* =================================================
+          DIGITAL TWIN TIMELINE
+      ================================================== */}
+
+      <Card
+        sx={{
+          mt: 3,
+          borderRadius: 4,
+          border:
+            "1px solid #e5e7eb",
+          boxShadow: "none",
+        }}
+      >
+
+        <CardContent>
+
+          <Typography
+            variant="h6"
+            fontWeight={900}
+            sx={{ mb: 3 }}
+          >
+            Digital Twin Timeline
+          </Typography>
+
+
+          <TimelineItem
+            time="10:42 AM"
+            title="Normal activity detected"
+            description="Animal movement and behaviour within expected range."
+            color="#16a34a"
+          />
+
+          <TimelineItem
+            time="10:18 AM"
+            title="Feed consumption recorded"
+            description={`${animal.feed} kg feed consumed.`}
+            color="#84cc16"
+          />
+
+          <TimelineItem
+            time="09:45 AM"
+            title="Health sensor updated"
+            description={`Temperature ${animal.temperature}°C • Heart rate ${animal.heartRate} BPM`}
+            color="#2563eb"
+          />
+
+          <TimelineItem
+            time="08:30 AM"
+            title="AI vision scan completed"
+            description="Animal identified and behaviour classification completed."
+            color="#8b5cf6"
+            last
+          />
+
+        </CardContent>
+
       </Card>
 
     </Box>
   );
 }
 
-export default DigitalTwin;
+
+/* =========================================================
+   INFO BOX
+========================================================= */
+
+function InfoBox({
+  title,
+  value,
+  icon,
+}) {
+  return (
+    <Grid
+      item
+      xs={6}
+      md={3}
+    >
+
+      <Box
+        sx={{
+          p: 2,
+          borderRadius: 3,
+          backgroundColor:
+            "#f8fafc",
+        }}
+      >
+
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            mb: 0.5,
+          }}
+        >
+
+          <Box
+            sx={{
+              color: "#047857",
+            }}
+          >
+            {icon}
+          </Box>
+
+          <Typography
+            variant="caption"
+            color="text.secondary"
+          >
+            {title}
+          </Typography>
+
+        </Box>
+
+        <Typography
+          fontWeight={800}
+        >
+          {value}
+        </Typography>
+
+      </Box>
+
+    </Grid>
+  );
+}
+
+
+/* =========================================================
+   METRIC CARD
+========================================================= */
+
+function MetricCard({
+  title,
+  value,
+  subtitle,
+  icon,
+  color,
+  bg,
+  progress,
+}) {
+  return (
+    <Grid
+      item
+      xs={12}
+      sm={6}
+      md={3}
+    >
+
+      <Card
+        sx={{
+          borderRadius: 4,
+          border:
+            "1px solid #e5e7eb",
+          boxShadow: "none",
+          height: "100%",
+        }}
+      >
+
+        <CardContent>
+
+          <Avatar
+            sx={{
+              backgroundColor: bg,
+              color: color,
+              mb: 2,
+            }}
+          >
+            {icon}
+          </Avatar>
+
+
+          <Typography
+            variant="body2"
+            color="text.secondary"
+          >
+            {title}
+          </Typography>
+
+
+          <Typography
+            variant="h5"
+            fontWeight={900}
+            sx={{ mt: 0.3 }}
+          >
+            {value}
+          </Typography>
+
+
+          <Typography
+            variant="caption"
+            color="text.secondary"
+          >
+            {subtitle}
+          </Typography>
+
+
+          <LinearProgress
+            variant="determinate"
+            value={progress}
+            sx={{
+              mt: 2,
+              height: 6,
+              borderRadius: 5,
+              backgroundColor:
+                "#e5e7eb",
+
+              "& .MuiLinearProgress-bar":
+                {
+                  backgroundColor:
+                    color,
+                  borderRadius: 5,
+                },
+            }}
+          />
+
+        </CardContent>
+
+      </Card>
+
+    </Grid>
+  );
+}
+
+
+/* =========================================================
+   BEHAVIOUR BAR
+========================================================= */
+
+function BehaviourBar({
+  label,
+  value,
+}) {
+  return (
+    <Box sx={{ mb: 2.5 }}>
+
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent:
+            "space-between",
+          mb: 0.6,
+        }}
+      >
+
+        <Typography
+          variant="body2"
+          fontWeight={700}
+        >
+          {label}
+        </Typography>
+
+        <Typography
+          variant="body2"
+          fontWeight={800}
+        >
+          {value}%
+        </Typography>
+
+      </Box>
+
+      <LinearProgress
+        variant="determinate"
+        value={value}
+        sx={{
+          height: 8,
+          borderRadius: 5,
+          backgroundColor:
+            "#e5e7eb",
+
+          "& .MuiLinearProgress-bar":
+            {
+              borderRadius: 5,
+              background:
+                "linear-gradient(90deg, #10b981, #06b6d4)",
+            },
+        }}
+      />
+
+    </Box>
+  );
+}
+
+
+/* =========================================================
+   PRODUCTION ROW
+========================================================= */
+
+function ProductionRow({
+  icon,
+  title,
+  value,
+  color,
+}) {
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent:
+          "space-between",
+        mb: 2,
+      }}
+    >
+
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
+        }}
+      >
+
+        <Avatar
+          sx={{
+            width: 38,
+            height: 38,
+            backgroundColor:
+              `${color}20`,
+            color: color,
+          }}
+        >
+          {icon}
+        </Avatar>
+
+        <Typography
+          fontWeight={700}
+        >
+          {title}
+        </Typography>
+
+      </Box>
+
+
+      <Typography
+        fontWeight={900}
+        color={color}
+      >
+        {value}
+      </Typography>
+
+    </Box>
+  );
+}
+
+
+/* =========================================================
+   TIMELINE
+========================================================= */
+
+function TimelineItem({
+  time,
+  title,
+  description,
+  color,
+  last,
+}) {
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        gap: 2,
+        minHeight: last
+          ? "auto"
+          : 85,
+      }}
+    >
+
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection:
+            "column",
+          alignItems: "center",
+        }}
+      >
+
+        <Box
+          sx={{
+            width: 13,
+            height: 13,
+            borderRadius: "50%",
+            backgroundColor:
+              color,
+            boxShadow:
+              `0 0 0 5px ${color}20`,
+          }}
+        />
+
+        {!last && (
+          <Box
+            sx={{
+              width: 2,
+              flex: 1,
+              backgroundColor:
+                "#e5e7eb",
+              mt: 1,
+            }}
+          />
+        )}
+
+      </Box>
+
+
+      <Box sx={{ pb: 2 }}>
+
+        <Typography
+          variant="caption"
+          color="text.secondary"
+        >
+          {time}
+        </Typography>
+
+        <Typography
+          fontWeight={800}
+        >
+          {title}
+        </Typography>
+
+        <Typography
+          variant="body2"
+          color="text.secondary"
+        >
+          {description}
+        </Typography>
+
+      </Box>
+
+    </Box>
+  );
+}

@@ -1,4 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useState } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -17,142 +23,188 @@ import Settings from "./pages/Settings";
 import MainLayout from "./layouts/MainLayout";
 
 function App() {
+
+  const [darkMode, setDarkMode] = useState(false);
+
   return (
-    <BrowserRouter>
-      <Routes>
+    <BoxWrapper darkMode={darkMode}>
 
-        {/* Login */}
-        <Route path="/" element={<Login />} />
+      <BrowserRouter>
 
-        {/* Dashboard */}
-        <Route
-          path="/dashboard"
-          element={
-            <MainLayout>
-              <Dashboard />
-            </MainLayout>
-          }
-        />
+        <Routes>
 
-        {/* Farms */}
-        <Route
-          path="/farms"
-          element={
-            <MainLayout>
-              <Farms />
-            </MainLayout>
-          }
-        />
+          {/* Login */}
+          <Route
+            path="/"
+            element={<Login />}
+          />
 
-        {/* Animals */}
-        <Route
-          path="/animals"
-          element={
-            <MainLayout>
-              <Animals />
-            </MainLayout>
-          }
-        />
+          {/* Dashboard */}
+          <Route
+            path="/dashboard"
+            element={
+              <MainLayout>
+                <Dashboard />
+              </MainLayout>
+            }
+          />
 
-        {/* Digital Twin */}
-        <Route
-          path="/digital-twin"
-          element={
-            <MainLayout>
-              <DigitalTwin />
-            </MainLayout>
-          }
-        />
+          {/* Farms */}
+          <Route
+            path="/farms"
+            element={
+              <MainLayout>
+                <Farms />
+              </MainLayout>
+            }
+          />
 
-        {/* Feed */}
-        <Route
-          path="/feed"
-          element={
-            <MainLayout>
-              <Feed />
-            </MainLayout>
-          }
-        />
+          {/* Animals */}
+          <Route
+            path="/animals"
+            element={
+              <MainLayout>
+                <Animals />
+              </MainLayout>
+            }
+          />
 
-        {/* Milk */}
-        <Route
-          path="/milk"
-          element={
-            <MainLayout>
-              <Milk />
-            </MainLayout>
-          }
-        />
+          {/* Digital Twin */}
+          <Route
+            path="/digital-twin"
+            element={
+              <MainLayout>
+                <DigitalTwin />
+              </MainLayout>
+            }
+          />
 
-        {/* Eggs */}
-        <Route
-          path="/eggs"
-          element={
-            <MainLayout>
-              <Eggs />
-            </MainLayout>
-          }
-        />
+          {/* Feed */}
+          <Route
+            path="/feed"
+            element={
+              <MainLayout>
+                <Feed />
+              </MainLayout>
+            }
+          />
 
-        {/* Wool */}
-        <Route
-          path="/wool"
-          element={
-            <MainLayout>
-              <Wool />
-            </MainLayout>
-          }
-        />
+          {/* Milk */}
+          <Route
+            path="/milk"
+            element={
+              <MainLayout>
+                <Milk />
+              </MainLayout>
+            }
+          />
 
-        {/* Reports */}
-        <Route
-          path="/reports"
-          element={
-            <MainLayout>
-              <Reports />
-            </MainLayout>
-          }
-        />
+          {/* Eggs */}
+          <Route
+            path="/eggs"
+            element={
+              <MainLayout>
+                <Eggs />
+              </MainLayout>
+            }
+          />
 
-        {/* AI Monitoring */}
-        <Route
-          path="/ai-monitoring"
-          element={
-            <MainLayout>
-              <AIMonitoring />
-            </MainLayout>
-          }
-        />
+          {/* Wool */}
+          <Route
+            path="/wool"
+            element={
+              <MainLayout>
+                <Wool />
+              </MainLayout>
+            }
+          />
 
-        {/* Predictions */}
-        <Route
-          path="/predictions"
-          element={
-            <MainLayout>
-              <Predictions />
-            </MainLayout>
-          }
-        />
+          {/* Reports */}
+          <Route
+            path="/reports"
+            element={
+              <MainLayout>
+                <Reports />
+              </MainLayout>
+            }
+          />
 
-        {/* Settings */}
-        <Route
-          path="/settings"
-          element={
-            <MainLayout>
-              <Settings />
-            </MainLayout>
-          }
-        />
+          {/* AI Monitoring */}
+          <Route
+            path="/ai-monitoring"
+            element={
+              <MainLayout>
+                <AIMonitoring />
+              </MainLayout>
+            }
+          />
 
-        {/* Unknown URL */}
-        <Route
-          path="*"
-          element={<Navigate to="/" replace />}
-        />
+          {/* Predictions */}
+          <Route
+            path="/predictions"
+            element={
+              <MainLayout>
+                <Predictions />
+              </MainLayout>
+            }
+          />
 
-      </Routes>
-    </BrowserRouter>
+          {/* Settings */}
+          <Route
+            path="/settings"
+            element={
+              <MainLayout>
+                <Settings
+                  darkMode={darkMode}
+                  setDarkMode={setDarkMode}
+                />
+              </MainLayout>
+            }
+          />
+
+          {/* Unknown */}
+          <Route
+            path="*"
+            element={
+              <Navigate
+                to="/"
+                replace
+              />
+            }
+          />
+
+        </Routes>
+
+      </BrowserRouter>
+
+    </BoxWrapper>
   );
 }
+
+
+function BoxWrapper({ children, darkMode }) {
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+
+        backgroundColor: darkMode
+          ? "#111827"
+          : "#f8fafc",
+
+        color: darkMode
+          ? "#ffffff"
+          : "#111827",
+
+        transition:
+          "background-color 0.3s ease",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 
 export default App;

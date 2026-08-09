@@ -24,7 +24,7 @@ import {
   Settings
 } from "@mui/icons-material";
 
-import { Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
 const menuItems = [
   {
@@ -117,21 +117,34 @@ export default function Sidebar() {
         </Typography>
       </Toolbar>
 
-      {/* Navigation */}
-      <List>
+      {/* Menu */}
+      <List sx={{ px: 1 }}>
         {menuItems.map((item) => (
           <ListItem
             key={item.name}
             disablePadding
+            sx={{ mb: 0.5 }}
           >
             <ListItemButton
-              component={Link}
+              component={NavLink}
               to={item.path}
               sx={{
+                borderRadius: "8px",
                 color: "white",
+                minHeight: "48px",
 
                 "&:hover": {
-                  backgroundColor: "#2e7d32"
+                  backgroundColor: "rgba(255,255,255,0.15)"
+                },
+
+                "&.active": {
+                  backgroundColor: "white",
+                  color: "#1b5e20",
+                  fontWeight: "bold"
+                },
+
+                "&.active .MuiListItemIcon-root": {
+                  color: "#1b5e20"
                 }
               }}
             >
@@ -146,6 +159,9 @@ export default function Sidebar() {
 
               <ListItemText
                 primary={item.name}
+                primaryTypographyProps={{
+                  fontWeight: "inherit"
+                }}
               />
             </ListItemButton>
           </ListItem>
