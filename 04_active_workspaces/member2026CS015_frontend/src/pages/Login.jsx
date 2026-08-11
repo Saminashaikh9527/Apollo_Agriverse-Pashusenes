@@ -1,923 +1,620 @@
-import {
-  TextField,
-  Button,
-  Paper,
-  Typography,
-  Box,
-  IconButton,
-  InputAdornment,
-  Checkbox,
-  FormControlLabel,
-  Divider,
-  Alert,
-  Avatar,
-} from "@mui/material";
-
-import {
-  Visibility,
-  VisibilityOff,
-  Agriculture,
-  ArrowForward,
-  Security,
-  Pets,
-  AutoGraph,
-} from "@mui/icons-material";
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-
-export default function Login() {
-
+function Login() {
   const navigate = useNavigate();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
 
-  const [showPassword, setShowPassword] =
-    useState(false);
-
-  const [rememberMe, setRememberMe] =
-    useState(false);
-
-  const [error, setError] =
-    useState("");
-
-
-  const handleLogin = () => {
-
+  const handleLogin = (e) => {
+    e.preventDefault();
     setError("");
 
-    if (!email || !password) {
-      setError(
-        "Please enter your email and password."
-      );
+    // Frontend-only login.
+    // Backend can be connected later by your group member.
+    if (!email.trim() || !password.trim()) {
+      setError("Please enter email and password.");
       return;
     }
 
-    // Demo login
-    if (
-      email === "admin@gmail.com" &&
-      password === "123456"
-    ) {
+    // Temporary frontend login
+    localStorage.setItem("isLoggedIn", "true");
+    localStorage.setItem("userEmail", email);
 
-      if (rememberMe) {
-        localStorage.setItem(
-          "agrolens_remember",
-          "true"
-        );
-      }
-
-      navigate("/dashboard");
-
-    } else {
-
-      setError(
-        "Invalid email or password."
-      );
-
-    }
+    navigate("/dashboard");
   };
 
-
   return (
-
-    <Box
-      sx={{
-        minHeight: "100vh",
-
-        display: "flex",
-
-        backgroundColor: "#f8fafc",
-
-        fontFamily:
-          "'Inter', 'Roboto', sans-serif",
-      }}
-    >
-
-      {/* =================================================
-          LEFT BRANDING PANEL
-      ================================================= */}
-
-      <Box
-        sx={{
-          display: {
-            xs: "none",
-            md: "flex",
-          },
-
-          width: "52%",
-
-          minHeight: "100vh",
-
-          position: "relative",
-
-          overflow: "hidden",
-
-          flexDirection: "column",
-
-          justifyContent: "space-between",
-
-          p: 6,
-
-          color: "#ffffff",
-
-          background:
-            "linear-gradient(145deg, #064e3b 0%, #047857 45%, #16a34a 100%)",
-        }}
-      >
-
-        {/* Decorative circles */}
-
-        <Box
-          sx={{
-            position: "absolute",
-
-            width: 450,
-            height: 450,
-
-            borderRadius: "50%",
-
-            background:
-              "rgba(255,255,255,0.05)",
-
-            top: -180,
-            right: -150,
-          }}
-        />
-
-        <Box
-          sx={{
-            position: "absolute",
-
-            width: 350,
-            height: 350,
-
-            borderRadius: "50%",
-
-            background:
-              "rgba(255,255,255,0.04)",
-
-            bottom: -150,
-            left: -100,
-          }}
-        />
-
-
-        {/* LOGO */}
-
-        <Box
-          sx={{
-            position: "relative",
-            zIndex: 2,
-
-            display: "flex",
-            alignItems: "center",
-            gap: 1.5,
-          }}
-        >
-
-          <Avatar
-            sx={{
-              width: 54,
-              height: 54,
-
-              backgroundColor:
-                "#ffffff",
-
-              color: "#047857",
-
-              boxShadow:
-                "0 8px 25px rgba(0,0,0,0.15)",
-            }}
-          >
-            <Agriculture
-              sx={{
-                fontSize: 32,
-              }}
-            />
-          </Avatar>
-
-
-          <Box>
-
-            <Typography
-              fontWeight={900}
-              fontSize={22}
-            >
-              AgroLens PLF
-            </Typography>
-
-            <Typography
-              fontSize={12}
-              sx={{
-                opacity: 0.8,
-                letterSpacing: 1,
-              }}
-            >
-              PRECISION LIVESTOCK FARMING
-            </Typography>
-
-          </Box>
-
-        </Box>
-
-
-        {/* MAIN CONTENT */}
-
-        <Box
-          sx={{
-            position: "relative",
-            zIndex: 2,
-
-            maxWidth: 600,
-
-            my: 6,
-          }}
-        >
-
-          <Typography
-            sx={{
-              fontSize: {
-                md: 42,
-                lg: 52,
-              },
-
-              lineHeight: 1.1,
-
-              fontWeight: 900,
-
-              mb: 3,
-            }}
-          >
-            Smarter farms.
-            <br />
-
-            Healthier livestock.
-            <br />
-
-            Better decisions.
-          </Typography>
-
-
-          <Typography
-            sx={{
-              fontSize: 17,
-
-              lineHeight: 1.7,
-
-              opacity: 0.88,
-
-              maxWidth: 520,
-
-              mb: 4,
-            }}
-          >
-            Monitor your livestock, understand animal
-            health, track production and make
-            data-driven farming decisions with
-            AgroLens PLF.
-          </Typography>
-
-
-          {/* FEATURES */}
-
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 2,
-            }}
-          >
-
-            <Feature
-              icon={<Pets />}
-              title="Complete Livestock Management"
-              text="Track cows, buffaloes, goats, sheep and poultry."
-            />
-
-            <Feature
-              icon={<AutoGraph />}
-              title="AI-Powered Monitoring"
-              text="Identify health risks and unusual animal behaviour."
-            />
-
-            <Feature
-              icon={<Security />}
-              title="Secure Farm Data"
-              text="Your farm information stays protected."
-            />
-
-          </Box>
-
-        </Box>
-
-
-        {/* FOOTER */}
-
-        <Typography
-          sx={{
-            position: "relative",
-            zIndex: 2,
-
-            fontSize: 12,
-
-            opacity: 0.65,
-          }}
-        >
-          © 2026 AgroLens PLF · Precision Livestock
-          Farming
-        </Typography>
-
-      </Box>
-
-
-      {/* =================================================
-          RIGHT LOGIN PANEL
-      ================================================= */}
-
-      <Box
-        sx={{
-          flex: 1,
-
-          minHeight: "100vh",
-
-          display: "flex",
-
-          alignItems: "center",
-
-          justifyContent: "center",
-
-          p: {
-            xs: 2,
-            sm: 4,
-            md: 6,
-          },
-
-          backgroundColor: "#ffffff",
-        }}
-      >
-
-        <Box
-          sx={{
-            width: "100%",
-
-            maxWidth: 450,
-          }}
-        >
-
-          {/* MOBILE LOGO */}
-
-          <Box
-            sx={{
-              display: {
-                xs: "flex",
-                md: "none",
-              },
-
-              alignItems: "center",
-
-              justifyContent: "center",
-
-              gap: 1.5,
-
-              mb: 5,
-            }}
-          >
-
-            <Avatar
-              sx={{
-                backgroundColor: "#dcfce7",
-                color: "#15803d",
-              }}
-            >
-              <Agriculture />
-            </Avatar>
-
-            <Typography
-              fontWeight={900}
-              fontSize={22}
-              color="#064e3b"
-            >
-              AgroLens PLF
-            </Typography>
-
-          </Box>
-
-
-          {/* LOGIN CARD */}
-
-          <Paper
-            elevation={0}
-            sx={{
-              p: {
-                xs: 1,
-                sm: 2,
-              },
-
-              border: "none",
-
-              boxShadow: "none",
-            }}
-          >
-
-            <Typography
-              variant="h4"
-              fontWeight={900}
-              color="#111827"
-              sx={{
-                mb: 1,
-              }}
-            >
-              Welcome back
-            </Typography>
-
-
-            <Typography
-              color="text.secondary"
-              sx={{
-                mb: 4,
-                fontSize: 15,
-              }}
-            >
-              Sign in to manage your farm and
-              livestock.
-            </Typography>
-
-
-            {/* ERROR */}
-
-            {error && (
-
-              <Alert
-                severity="error"
-                sx={{
-                  mb: 3,
-                  borderRadius: 2,
-                }}
-              >
-                {error}
-              </Alert>
-
-            )}
-
-
-            {/* EMAIL */}
-
-            <Typography
-              variant="body2"
-              fontWeight={700}
-              sx={{
-                mb: 1,
-                color: "#374151",
-              }}
-            >
-              Email address
-            </Typography>
-
-
-            <TextField
-              fullWidth
-
-              placeholder="you@example.com"
-
-              type="email"
-
-              value={email}
-
-              onChange={(e) => {
-                setEmail(e.target.value);
-                setError("");
-              }}
-
-              sx={{
-                mb: 2.5,
-
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: 2.5,
-
-                  backgroundColor: "#f9fafb",
-
-                  "&:hover fieldset": {
-                    borderColor: "#16a34a",
-                  },
-
-                  "&.Mui-focused fieldset": {
-                    borderColor: "#16a34a",
-                  },
-                },
-              }}
-            />
-
-
-            {/* PASSWORD */}
-
-            <Box
-              sx={{
-                display: "flex",
-
-                justifyContent:
-                  "space-between",
-
-                alignItems: "center",
-
-                mb: 1,
-              }}
-            >
-
-              <Typography
-                variant="body2"
-                fontWeight={700}
-                color="#374151"
-              >
-                Password
-              </Typography>
-
-
-              <Button
-                size="small"
-                sx={{
-                  textTransform: "none",
-
-                  color: "#15803d",
-
-                  fontWeight: 700,
-
-                  minWidth: "auto",
-
-                  p: 0,
-
-                  "&:hover": {
-                    backgroundColor:
-                      "transparent",
-                  },
-                }}
-              >
-                Forgot password?
-              </Button>
-
-            </Box>
-
-
-            <TextField
-              fullWidth
-
-              placeholder="Enter your password"
-
-              type={
-                showPassword
-                  ? "text"
-                  : "password"
-              }
-
-              value={password}
-
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setError("");
-              }}
-
-              InputProps={{
-                endAdornment: (
-
-                  <InputAdornment
-                    position="end"
+    <div style={styles.page}>
+      {/* Background decoration */}
+      <div style={styles.backgroundOverlay}></div>
+
+      <div style={styles.backgroundCircleOne}></div>
+      <div style={styles.backgroundCircleTwo}></div>
+      <div style={styles.backgroundCircleThree}></div>
+
+      {/* Main container */}
+      <div style={styles.container}>
+
+        {/* LEFT SIDE */}
+        <div style={styles.leftSection}>
+
+          <div style={styles.brandSection}>
+            <h1 style={styles.projectName}>
+              Apollo AgriVerse-Pashusense
+            </h1>
+
+            <p style={styles.tagline}>
+              Smarter farms. Healthier livestock. Better decisions.
+            </p>
+          </div>
+
+          <div style={styles.heroContent}>
+            <div style={styles.iconCircle}>
+              🐄
+            </div>
+
+            <h2 style={styles.heroTitle}>
+              Welcome to your
+              <br />
+              <span style={styles.heroHighlight}>
+                digital livestock farm
+              </span>
+            </h2>
+
+            <p style={styles.heroText}>
+              Monitor your livestock, manage farms, track production
+              and make smarter farming decisions from one platform.
+            </p>
+          </div>
+
+          <div style={styles.features}>
+            <div style={styles.feature}>
+              <span style={styles.featureIcon}>🌱</span>
+              <span>Smart Farm Management</span>
+            </div>
+
+            <div style={styles.feature}>
+              <span style={styles.featureIcon}>🐄</span>
+              <span>Livestock Monitoring</span>
+            </div>
+
+            <div style={styles.feature}>
+              <span style={styles.featureIcon}>📊</span>
+              <span>Data-Driven Insights</span>
+            </div>
+          </div>
+
+        </div>
+
+        {/* RIGHT SIDE - LOGIN */}
+        <div style={styles.rightSection}>
+
+          <div style={styles.loginCard}>
+
+            <div style={styles.loginHeader}>
+              <div style={styles.loginIcon}>
+                🔐
+              </div>
+
+              <h2 style={styles.loginTitle}>
+                Welcome Back
+              </h2>
+
+              <p style={styles.loginSubtitle}>
+                Sign in to continue to your farm dashboard
+              </p>
+            </div>
+
+            <form onSubmit={handleLogin}>
+
+              {/* EMAIL */}
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>
+                  Email Address
+                </label>
+
+                <div style={styles.inputWrapper}>
+                  <span style={styles.inputIcon}>
+                    ✉️
+                  </span>
+
+                  <input
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    style={styles.input}
+                    autoComplete="email"
+                  />
+                </div>
+              </div>
+
+              {/* PASSWORD */}
+              <div style={styles.inputGroup}>
+                <label style={styles.label}>
+                  Password
+                </label>
+
+                <div style={styles.inputWrapper}>
+                  <span style={styles.inputIcon}>
+                    🔒
+                  </span>
+
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={styles.input}
+                    autoComplete="current-password"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowPassword(!showPassword)
+                    }
+                    style={styles.passwordButton}
                   >
+                    {showPassword ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
 
-                    <IconButton
-                      onClick={() =>
-                        setShowPassword(
-                          !showPassword
-                        )
-                      }
-                      edge="end"
-                    >
+              {/* ERROR */}
+              {error && (
+                <div style={styles.error}>
+                  {error}
+                </div>
+              )}
 
-                      {showPassword ? (
-                        <VisibilityOff />
-                      ) : (
-                        <Visibility />
-                      )}
+              {/* OPTIONS */}
+              <div style={styles.options}>
+                <label style={styles.remember}>
+                  <input
+                    type="checkbox"
+                    style={styles.checkbox}
+                  />
+                  <span>Remember me</span>
+                </label>
 
-                    </IconButton>
-
-                  </InputAdornment>
-
-                ),
-              }}
-
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: 2.5,
-
-                  backgroundColor: "#f9fafb",
-
-                  "&:hover fieldset": {
-                    borderColor: "#16a34a",
-                  },
-
-                  "&.Mui-focused fieldset": {
-                    borderColor: "#16a34a",
-                  },
-                },
-              }}
-            />
-
-
-            {/* REMEMBER */}
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={rememberMe}
-
-                  onChange={(e) =>
-                    setRememberMe(
-                      e.target.checked
+                <button
+                  type="button"
+                  style={styles.forgotButton}
+                  onClick={() =>
+                    setError(
+                      "Password reset will be available when the backend is connected."
                     )
                   }
-
-                  sx={{
-                    color: "#9ca3af",
-
-                    "&.Mui-checked": {
-                      color: "#16a34a",
-                    },
-                  }}
-                />
-              }
-
-              label={
-                <Typography
-                  variant="body2"
-                  color="#4b5563"
                 >
-                  Remember me
-                </Typography>
-              }
+                  Forgot password?
+                </button>
+              </div>
 
-              sx={{
-                mt: 1,
-                mb: 2,
-              }}
-            />
-
-
-            {/* LOGIN BUTTON */}
-
-            <Button
-              fullWidth
-
-              variant="contained"
-
-              size="large"
-
-              endIcon={
-                <ArrowForward />
-              }
-
-              onClick={handleLogin}
-
-              sx={{
-                py: 1.6,
-
-                borderRadius: 2.5,
-
-                textTransform: "none",
-
-                fontSize: 16,
-
-                fontWeight: 900,
-
-                background:
-                  "linear-gradient(135deg, #15803d, #16a34a)",
-
-                boxShadow:
-                  "0 8px 20px rgba(22,163,74,0.20)",
-
-                "&:hover": {
-                  background:
-                    "linear-gradient(135deg, #166534, #15803d)",
-
-                  boxShadow:
-                    "0 10px 25px rgba(22,163,74,0.28)",
-                },
-              }}
-            >
-              Sign in
-            </Button>
-
-
-            {/* DIVIDER */}
-
-            <Box
-              sx={{
-                display: "flex",
-
-                alignItems: "center",
-
-                gap: 2,
-
-                my: 3,
-              }}
-            >
-
-              <Divider
-                sx={{
-                  flex: 1,
-                }}
-              />
-
-              <Typography
-                variant="caption"
-                color="text.secondary"
+              {/* LOGIN BUTTON */}
+              <button
+                type="submit"
+                style={styles.loginButton}
               >
-                OR
-              </Typography>
+                <span>Sign In</span>
+                <span style={styles.arrow}>
+                  →
+                </span>
+              </button>
 
-              <Divider
-                sx={{
-                  flex: 1,
-                }}
-              />
+            </form>
 
-            </Box>
+            <div style={styles.divider}>
+              <span style={styles.dividerLine}></span>
+              <span style={styles.dividerText}>
+                Secure Access
+              </span>
+              <span style={styles.dividerLine}></span>
+            </div>
 
+            <div style={styles.security}>
+              <span style={styles.securityIcon}>
+                🛡️
+              </span>
 
-            {/* REGISTER */}
+              <span>
+                Your farm data is protected
+              </span>
+            </div>
 
-            <Box
-              sx={{
-                textAlign: "center",
-              }}
-            >
+          </div>
 
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                component="span"
-              >
-                Don't have an account?
-              </Typography>
+        </div>
+      </div>
 
-
-              <Button
-                onClick={() =>
-                  navigate("/register")
-                }
-
-                sx={{
-                  ml: 0.5,
-
-                  textTransform: "none",
-
-                  color: "#15803d",
-
-                  fontWeight: 900,
-
-                  "&:hover": {
-                    backgroundColor:
-                      "transparent",
-
-                    textDecoration:
-                      "underline",
-                  },
-                }}
-              >
-                Create an account
-              </Button>
-
-            </Box>
-
-
-            {/* SECURITY */}
-
-            <Box
-              sx={{
-                display: "flex",
-
-                justifyContent: "center",
-
-                alignItems: "center",
-
-                gap: 1,
-
-                mt: 5,
-
-                color: "#9ca3af",
-              }}
-            >
-
-              <Security
-                sx={{
-                  fontSize: 16,
-                }}
-              />
-
-              <Typography
-                variant="caption"
-              >
-                Secure access to your farm
-              </Typography>
-
-            </Box>
-
-
-            {/* DEMO INFORMATION */}
-
-            <Box
-              sx={{
-                mt: 3,
-
-                p: 1.5,
-
-                borderRadius: 2,
-
-                backgroundColor: "#f8fafc",
-
-                textAlign: "center",
-              }}
-            >
-
-              <Typography
-                variant="caption"
-                color="text.secondary"
-              >
-                Demo account: admin@gmail.com /
-                123456
-              </Typography>
-
-            </Box>
-
-          </Paper>
-
-        </Box>
-
-      </Box>
-
-    </Box>
+      {/* FOOTER */}
+      <div style={styles.footer}>
+        © 2026 Apollo AgriVerse-Pashusense
+      </div>
+    </div>
   );
 }
 
+const styles = {
+  page: {
+    minHeight: "100vh",
+    width: "100%",
+    position: "relative",
+    overflow: "hidden",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontFamily:
+      "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    background:
+      "linear-gradient(135deg, #0b3d2e 0%, #12634a 45%, #d8eadf 100%)",
+  },
 
-/* ==========================================================
-   FEATURE COMPONENT
-========================================================== */
+  backgroundOverlay: {
+    position: "absolute",
+    inset: 0,
+    background:
+      "linear-gradient(120deg, rgba(5,35,26,0.82), rgba(16,87,64,0.65), rgba(240,248,243,0.18))",
+    zIndex: 0,
+  },
 
-function Feature({
-  icon,
-  title,
-  text,
-}) {
+  backgroundCircleOne: {
+    position: "absolute",
+    width: "500px",
+    height: "500px",
+    borderRadius: "50%",
+    background: "rgba(255,255,255,0.06)",
+    top: "-200px",
+    left: "-180px",
+    zIndex: 1,
+  },
 
-  return (
+  backgroundCircleTwo: {
+    position: "absolute",
+    width: "420px",
+    height: "420px",
+    borderRadius: "50%",
+    background: "rgba(165,214,167,0.12)",
+    bottom: "-180px",
+    right: "-120px",
+    zIndex: 1,
+  },
 
-    <Box
-      sx={{
-        display: "flex",
+  backgroundCircleThree: {
+    position: "absolute",
+    width: "180px",
+    height: "180px",
+    borderRadius: "50%",
+    background: "rgba(255,255,255,0.08)",
+    top: "18%",
+    right: "34%",
+    zIndex: 1,
+  },
 
-        gap: 2,
+  container: {
+    width: "92%",
+    maxWidth: "1180px",
+    minHeight: "650px",
+    display: "grid",
+    gridTemplateColumns: "1.15fr 0.85fr",
+    borderRadius: "28px",
+    overflow: "hidden",
+    position: "relative",
+    zIndex: 5,
+    boxShadow:
+      "0 30px 80px rgba(0,0,0,0.28)",
+    background: "rgba(255,255,255,0.12)",
+    backdropFilter: "blur(16px)",
+    WebkitBackdropFilter: "blur(16px)",
+    border: "1px solid rgba(255,255,255,0.22)",
+  },
 
-        alignItems: "center",
-      }}
-    >
+  /* LEFT */
 
-      <Avatar
-        sx={{
-          width: 42,
-          height: 42,
+  leftSection: {
+    padding: "55px 55px 45px",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    color: "#ffffff",
+    background:
+      "linear-gradient(145deg, rgba(4,45,33,0.72), rgba(16,105,75,0.50))",
+  },
 
-          backgroundColor:
-            "rgba(255,255,255,0.13)",
+  brandSection: {
+    textAlign: "left",
+  },
 
-          color: "#ffffff",
-        }}
-      >
-        {icon}
-      </Avatar>
+  projectName: {
+    margin: 0,
+    fontSize: "38px",
+    lineHeight: 1.1,
+    fontWeight: 800,
+    letterSpacing: "-1px",
+    color: "#ffffff",
+  },
 
+  tagline: {
+    margin: "10px 0 0",
+    fontSize: "13px",
+    lineHeight: 1.5,
+    fontWeight: 500,
+    letterSpacing: "0.2px",
+    color: "rgba(255,255,255,0.78)",
+  },
 
-      <Box>
+  heroContent: {
+    marginTop: "35px",
+  },
 
-        <Typography
-          fontWeight={800}
-          fontSize={14}
-        >
-          {title}
-        </Typography>
+  iconCircle: {
+    width: "70px",
+    height: "70px",
+    borderRadius: "20px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "36px",
+    background: "rgba(255,255,255,0.13)",
+    border: "1px solid rgba(255,255,255,0.20)",
+    boxShadow:
+      "0 12px 30px rgba(0,0,0,0.12)",
+  },
 
-        <Typography
-          fontSize={12}
-          sx={{
-            opacity: 0.72,
-            mt: 0.3,
-          }}
-        >
-          {text}
-        </Typography>
+  heroTitle: {
+    margin: "22px 0 12px",
+    fontSize: "36px",
+    lineHeight: 1.18,
+    fontWeight: 750,
+    letterSpacing: "-0.8px",
+  },
 
-      </Box>
+  heroHighlight: {
+    color: "#b8e986",
+  },
 
-    </Box>
-  );
-}
+  heroText: {
+    maxWidth: "520px",
+    margin: 0,
+    fontSize: "15px",
+    lineHeight: 1.7,
+    color: "rgba(255,255,255,0.76)",
+  },
+
+  features: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+    marginTop: "30px",
+  },
+
+  feature: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    fontSize: "14px",
+    color: "rgba(255,255,255,0.88)",
+  },
+
+  featureIcon: {
+    width: "32px",
+    height: "32px",
+    borderRadius: "10px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(255,255,255,0.11)",
+    fontSize: "16px",
+  },
+
+  /* RIGHT */
+
+  rightSection: {
+    padding: "40px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background:
+      "rgba(255,255,255,0.94)",
+  },
+
+  loginCard: {
+    width: "100%",
+    maxWidth: "390px",
+  },
+
+  loginHeader: {
+    textAlign: "center",
+    marginBottom: "30px",
+  },
+
+  loginIcon: {
+    width: "58px",
+    height: "58px",
+    margin: "0 auto 14px",
+    borderRadius: "17px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontSize: "25px",
+    background: "#e6f4ec",
+  },
+
+  loginTitle: {
+    margin: 0,
+    fontSize: "28px",
+    fontWeight: 750,
+    color: "#14352a",
+  },
+
+  loginSubtitle: {
+    margin: "8px 0 0",
+    fontSize: "13px",
+    lineHeight: 1.5,
+    color: "#718078",
+  },
+
+  inputGroup: {
+    marginBottom: "19px",
+  },
+
+  label: {
+    display: "block",
+    marginBottom: "8px",
+    fontSize: "13px",
+    fontWeight: 650,
+    color: "#263c34",
+  },
+
+  inputWrapper: {
+    height: "52px",
+    display: "flex",
+    alignItems: "center",
+    border: "1px solid #d8e2dc",
+    borderRadius: "13px",
+    background: "#ffffff",
+    transition: "all 0.2s ease",
+    overflow: "hidden",
+  },
+
+  inputIcon: {
+    width: "45px",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    fontSize: "16px",
+  },
+
+  input: {
+    flex: 1,
+    height: "100%",
+    border: "none",
+    outline: "none",
+    background: "transparent",
+    fontSize: "14px",
+    color: "#1d3028",
+    padding: "0 10px 0 0",
+  },
+
+  passwordButton: {
+    border: "none",
+    background: "transparent",
+    cursor: "pointer",
+    fontSize: "16px",
+    padding: "0 14px",
+  },
+
+  options: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    margin: "5px 0 22px",
+    gap: "10px",
+  },
+
+  remember: {
+    display: "flex",
+    alignItems: "center",
+    gap: "7px",
+    fontSize: "12px",
+    color: "#617068",
+    cursor: "pointer",
+  },
+
+  checkbox: {
+    accentColor: "#167653",
+    cursor: "pointer",
+  },
+
+  forgotButton: {
+    border: "none",
+    background: "none",
+    color: "#14734f",
+    fontSize: "12px",
+    fontWeight: 650,
+    cursor: "pointer",
+    padding: 0,
+  },
+
+  error: {
+    padding: "10px 12px",
+    marginBottom: "15px",
+    borderRadius: "10px",
+    background: "#fff0f0",
+    border: "1px solid #ffd0d0",
+    color: "#c53d3d",
+    fontSize: "12px",
+  },
+
+  loginButton: {
+    width: "100%",
+    height: "52px",
+    border: "none",
+    borderRadius: "13px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "15px",
+    cursor: "pointer",
+    color: "#ffffff",
+    background:
+      "linear-gradient(135deg, #126b49, #1d8b60)",
+    fontSize: "15px",
+    fontWeight: 700,
+    boxShadow:
+      "0 10px 24px rgba(18,107,73,0.25)",
+  },
+
+  arrow: {
+    fontSize: "20px",
+    lineHeight: 1,
+  },
+
+  divider: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    margin: "25px 0 18px",
+  },
+
+  dividerLine: {
+    flex: 1,
+    height: "1px",
+    background: "#e3e9e5",
+  },
+
+  dividerText: {
+    fontSize: "10px",
+    fontWeight: 600,
+    textTransform: "uppercase",
+    letterSpacing: "1px",
+    color: "#9aa7a0",
+  },
+
+  security: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: "7px",
+    fontSize: "11px",
+    color: "#84928b",
+  },
+
+  securityIcon: {
+    fontSize: "13px",
+  },
+
+  footer: {
+    position: "absolute",
+    bottom: "12px",
+    zIndex: 10,
+    color: "rgba(255,255,255,0.65)",
+    fontSize: "10px",
+  },
+};
+
+export default Login;

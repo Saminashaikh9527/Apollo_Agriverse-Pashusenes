@@ -1,1506 +1,528 @@
 import { useState } from "react";
 
-import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  Grid,
-  Avatar,
-  Chip,
-  Button,
-  TextField,
-  MenuItem,
-  LinearProgress,
-  Divider,
-  Stack,
-  Alert,
-} from "@mui/material";
-
-import {
-  Pets,
-  Favorite,
-  MonitorHeart,
-  Thermostat,
-  LocalDrink,
-  Restaurant,
-  DirectionsWalk,
-  AccessTime,
-  Warning,
-  CheckCircle,
-  TrendingUp,
-  CameraAlt,
-  Science,
-  Vaccines,
-} from "@mui/icons-material";
-
-import { useSearchParams } from "react-router-dom";
-
-
-/* =========================================================
-   DIGITAL TWIN DEMO DATA
-
-   Later replace this with data from FastAPI.
-========================================================= */
-
-const animals = [
-  {
-    tag: "COW001",
-    name: "Lakshmi",
-    species: "Cow",
-    breed: "Gir",
-    age: "4 years",
-    gender: "Female",
-    emoji: "🐄",
-
-    health: "Healthy",
-    healthScore: 94,
-
-    temperature: 38.5,
-    heartRate: 72,
-
-    activity: 88,
-    eating: 82,
-    resting: 46,
-    walking: 74,
-
-    milk: 28,
-    feed: 9.2,
-
-    water: 42,
-
-    alert: "No abnormal behaviour detected",
-
-    vaccination: "Up to date",
-
-    lastSeen: "Just now",
-  },
-
-  {
-    tag: "COW002",
-    name: "Ganga",
-    species: "Cow",
-    breed: "Holstein",
-    age: "3 years",
-    gender: "Female",
-    emoji: "🐄",
-
-    health: "Healthy",
-    healthScore: 97,
-
-    temperature: 38.4,
-    heartRate: 70,
-
-    activity: 92,
-    eating: 89,
-    resting: 40,
-    walking: 82,
-
-    milk: 31,
-    feed: 10.1,
-
-    water: 46,
-
-    alert: "Normal health pattern",
-
-    vaccination: "Up to date",
-
-    lastSeen: "Just now",
-  },
-
-  {
-    tag: "COW023",
-    name: "Kamadhenu",
-    species: "Cow",
-    breed: "Jersey",
-    age: "5 years",
-    gender: "Female",
-    emoji: "🐄",
-
-    health: "Attention",
-    healthScore: 68,
-
-    temperature: 39.4,
-    heartRate: 84,
-
-    activity: 58,
-    eating: 55,
-    resting: 71,
-    walking: 42,
-
-    milk: 19,
-    feed: 7.5,
-
-    water: 31,
-
-    alert: "Reduced activity detected",
-
-    vaccination: "Due in 12 days",
-
-    lastSeen: "2 min ago",
-  },
-
-  {
-    tag: "BUF001",
-    name: "Nandini",
-    species: "Buffalo",
-    breed: "Murrah",
-    age: "5 years",
-    gender: "Female",
-    emoji: "🐃",
-
-    health: "Healthy",
-    healthScore: 91,
-
-    temperature: 38.7,
-    heartRate: 68,
-
-    activity: 84,
-    eating: 80,
-    resting: 50,
-    walking: 71,
-
-    milk: 18,
-    feed: 11.2,
-
-    water: 51,
-
-    alert: "Normal health pattern",
-
-    vaccination: "Up to date",
-
-    lastSeen: "Just now",
-  },
-
-  {
-    tag: "GOAT001",
-    name: "Chikki",
-    species: "Goat",
-    breed: "Jamunapari",
-    age: "2 years",
-    gender: "Female",
-    emoji: "🐐",
-
-    health: "Healthy",
-    healthScore: 96,
-
-    temperature: 39.0,
-    heartRate: 82,
-
-    activity: 91,
-    eating: 86,
-    resting: 38,
-    walking: 88,
-
-    milk: 2,
-    feed: 2.1,
-
-    water: 8,
-
-    alert: "Normal health pattern",
-
-    vaccination: "Up to date",
-
-    lastSeen: "Just now",
-  },
-
-  {
-    tag: "SHE012",
-    name: "Moti",
-    species: "Sheep",
-    breed: "Deccani",
-    age: "3 years",
-    gender: "Male",
-    emoji: "🐑",
-
-    health: "High Risk",
-    healthScore: 41,
-
-    temperature: 40.1,
-    heartRate: 96,
-
-    activity: 35,
-    eating: 41,
-    resting: 82,
-    walking: 28,
-
-    milk: 0,
-    feed: 1.8,
-
-    water: 5,
-
-    alert: "High temperature + low activity",
-
-    vaccination: "Due",
-
-    lastSeen: "1 min ago",
-  },
-
-  {
-    tag: "HEN001",
-    name: "Ruby",
-    species: "Chicken",
-    breed: "Rhode Island",
-    age: "1 year",
-    gender: "Female",
-    emoji: "🐔",
-
-    health: "Healthy",
-    healthScore: 95,
-
-    temperature: 41.2,
-    heartRate: 280,
-
-    activity: 89,
-    eating: 84,
-    resting: 43,
-    walking: 77,
-
-    milk: 0,
-    feed: 0.12,
-
-    water: 0.25,
-
-    alert: "Normal health pattern",
-
-    vaccination: "Up to date",
-
-    lastSeen: "Just now",
-  },
-];
-
-
-/* =========================================================
-   MAIN DIGITAL TWIN
-========================================================= */
-
-export default function DigitalTwin() {
-  const [searchParams] =
-    useSearchParams();
-
-  const animalFromUrl =
-    searchParams.get("animal");
-
-  const [selectedTag, setSelectedTag] =
-    useState(
-      animalFromUrl || "COW001"
-    );
-
-
-  const animal =
-    animals.find(
-      (item) =>
-        item.tag === selectedTag
-    ) || animals[0];
-
+function DigitalTwin() {
+  const [image, setImage] = useState(null);
+  const [preview, setPreview] = useState("");
+  const [prediction, setPrediction] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    setImage(file);
+    setPreview(URL.createObjectURL(file));
+    setPrediction(null);
+  };
+
+  const handlePredict = () => {
+    if (!image) {
+      alert("Please upload an animal photo first.");
+      return;
+    }
+
+    setLoading(true);
+
+    // Temporary frontend-only prediction.
+    // Later replace this with your FastAPI API call.
+    setTimeout(() => {
+      setPrediction({
+        animal: "Cow",
+        health: "Healthy",
+        confidence: "94%",
+        temperature: "Normal",
+        activity: "Normal",
+        recommendation:
+          "Animal appears healthy. Continue regular feeding and monitoring.",
+      });
+
+      setLoading(false);
+    }, 1200);
+  };
+
+  const removeImage = () => {
+    setImage(null);
+    setPreview("");
+    setPrediction(null);
+  };
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        backgroundColor: "#f6faf8",
-        p: {
-          xs: 2,
-          sm: 3,
-          md: 4,
-        },
-      }}
-    >
-
-      {/* =================================================
-          HEADER
-      ================================================== */}
-
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent:
-            "space-between",
-
-          alignItems: {
-            xs: "flex-start",
-            md: "center",
-          },
-
-          gap: 2,
-          flexWrap: "wrap",
-          mb: 3,
-        }}
-      >
-
-        <Box>
-
-          <Typography
-            variant="h4"
-            fontWeight={900}
-            color="#12372a"
-          >
-            Digital Twin 🧬
-          </Typography>
-
-          <Typography
-            color="text.secondary"
-            sx={{ mt: 0.5 }}
-          >
-            Real-time digital representation
-            of your livestock.
-          </Typography>
-
-        </Box>
-
-
-        {/* LIVE STATUS */}
-
-        <Chip
-          icon={
-            <Box
-              sx={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                backgroundColor:
-                  "#22c55e",
-              }}
-            />
-          }
-          label="SYSTEM LIVE"
-          sx={{
-            fontWeight: 900,
-            color: "#166534",
-            backgroundColor:
-              "#dcfce7",
-            px: 1,
-          }}
-        />
-
-      </Box>
-
-
-      {/* =================================================
-          ANIMAL SELECTOR
-      ================================================== */}
-
-      <Card
-        sx={{
-          mb: 3,
-          borderRadius: 4,
-          border:
-            "1px solid #e5e7eb",
-          boxShadow: "none",
-        }}
-      >
-
-        <CardContent>
-
-          <Grid
-            container
-            spacing={2}
-            alignItems="center"
-          >
-
-            <Grid
-              item
-              xs={12}
-              md={5}
-            >
-
-              <TextField
-                select
-                fullWidth
-                label="Select Animal"
-                value={selectedTag}
-                onChange={(e) =>
-                  setSelectedTag(
-                    e.target.value
-                  )
-                }
-              >
-
-                {animals.map(
-                  (item) => (
-                    <MenuItem
-                      key={item.tag}
-                      value={item.tag}
-                    >
-                      {item.emoji}{" "}
-                      {item.tag} —{" "}
-                      {item.name}
-                    </MenuItem>
-                  )
-                )}
-
-              </TextField>
-
-            </Grid>
-
-
-            <Grid
-              item
-              xs={12}
-              md={7}
-            >
-
-              <Stack
-                direction="row"
-                spacing={1}
-                flexWrap="wrap"
-                useFlexGap
-              >
-
-                {animals.map(
-                  (item) => (
-                    <Chip
-                      key={item.tag}
-                      label={
-                        `${item.emoji} ${item.tag}`
-                      }
-                      onClick={() =>
-                        setSelectedTag(
-                          item.tag
-                        )
-                      }
-                      variant={
-                        selectedTag ===
-                        item.tag
-                          ? "filled"
-                          : "outlined"
-                      }
-                      sx={{
-                        fontWeight: 700,
-
-                        backgroundColor:
-                          selectedTag ===
-                          item.tag
-                            ? "#dcfce7"
-                            : "transparent",
-
-                        color:
-                          selectedTag ===
-                          item.tag
-                            ? "#166534"
-                            : "inherit",
-                      }}
-                    />
-                  )
-                )}
-
-              </Stack>
-
-            </Grid>
-
-          </Grid>
-
-        </CardContent>
-
-      </Card>
-
-
-      {/* =================================================
-          ANIMAL PROFILE
-      ================================================== */}
-
-      <Card
-        sx={{
-          mb: 3,
-          borderRadius: 4,
-          overflow: "hidden",
-          border:
-            "1px solid #e5e7eb",
-          boxShadow: "none",
-        }}
-      >
-
-        <Box
-          sx={{
-            background:
-              "linear-gradient(135deg, #064e3b, #059669)",
-            color: "white",
-            p: {
-              xs: 2.5,
-              md: 3.5,
-            },
-          }}
-        >
-
-          <Grid
-            container
-            spacing={3}
-            alignItems="center"
-          >
-
-            {/* ANIMAL */}
-
-            <Grid
-              item
-              xs={12}
-              md={4}
-            >
-
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems:
-                    "center",
-                  gap: 2,
-                }}
-              >
-
-                <Avatar
-                  sx={{
-                    width: 100,
-                    height: 100,
-                    fontSize: 58,
-                    backgroundColor:
-                      "rgba(255,255,255,0.15)",
-                    border:
-                      "3px solid rgba(255,255,255,0.3)",
-                  }}
-                >
-                  {animal.emoji}
-                </Avatar>
-
-                <Box>
-
-                  <Typography
-                    fontSize={13}
-                    sx={{
-                      opacity: 0.75,
-                    }}
-                  >
-                    DIGITAL TWIN
-                  </Typography>
-
-                  <Typography
-                    variant="h4"
-                    fontWeight={900}
-                  >
-                    {animal.tag}
-                  </Typography>
-
-                  <Typography>
-                    {animal.name} •{" "}
-                    {animal.breed}
-                  </Typography>
-
-                  <Chip
-                    label={
-                      animal.health
-                    }
-                    size="small"
-                    sx={{
-                      mt: 1,
-                      fontWeight: 800,
-                      backgroundColor:
-                        animal.health ===
-                        "Healthy"
-                          ? "#bbf7d0"
-                          : animal.health ===
-                            "Attention"
-                          ? "#fed7aa"
-                          : "#fecaca",
-
-                      color:
-                        animal.health ===
-                        "Healthy"
-                          ? "#166534"
-                          : animal.health ===
-                            "Attention"
-                          ? "#9a3412"
-                          : "#991b1b",
-                    }}
-                  />
-
-                </Box>
-
-              </Box>
-
-            </Grid>
-
-
-            {/* HEALTH SCORE */}
-
-            <Grid
-              item
-              xs={12}
-              md={4}
-            >
-
-              <Box
-                sx={{
-                  textAlign: "center",
-                }}
-              >
-
-                <Typography
-                  fontSize={13}
-                  sx={{
-                    opacity: 0.75,
-                  }}
-                >
-                  AI HEALTH SCORE
-                </Typography>
-
-                <Typography
-                  sx={{
-                    fontSize: 58,
-                    fontWeight: 900,
-                    lineHeight: 1.1,
-                  }}
-                >
-                  {animal.healthScore}
-                </Typography>
-
-                <Typography>
-                  out of 100
-                </Typography>
-
-              </Box>
-
-            </Grid>
-
-
-            {/* LIVE */}
-
-            <Grid
-              item
-              xs={12}
-              md={4}
-            >
-
-              <Box>
-
-                <Chip
-                  label="● LIVE MONITORING"
-                  sx={{
-                    color: "white",
-                    backgroundColor:
-                      "rgba(255,255,255,0.15)",
-                    fontWeight: 800,
-                    mb: 2,
-                  }}
+    <div style={styles.page}>
+      <div style={styles.header}>
+        <div>
+          <h1 style={styles.title}>Digital Twin</h1>
+          <p style={styles.subtitle}>
+            Upload an animal photo to analyze its health
+          </p>
+        </div>
+
+        <div style={styles.badge}>
+          🐄 AI Animal Analysis
+        </div>
+      </div>
+
+      <div style={styles.grid}>
+        {/* Upload section */}
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>Animal Photo</h2>
+
+          {!preview ? (
+            <label style={styles.uploadBox}>
+              <div style={styles.uploadIcon}>📷</div>
+
+              <h3 style={styles.uploadTitle}>
+                Upload Animal Photo
+              </h3>
+
+              <p style={styles.uploadText}>
+                Take or select a clear photo of the animal
+              </p>
+
+              <span style={styles.uploadButton}>
+                Choose Photo
+              </span>
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                style={{ display: "none" }}
+              />
+            </label>
+          ) : (
+            <div>
+              <div style={styles.imageContainer}>
+                <img
+                  src={preview}
+                  alt="Animal preview"
+                  style={styles.preview}
                 />
+              </div>
 
-                <Typography
-                  variant="body2"
-                  sx={{
-                    opacity: 0.8,
-                  }}
-                >
-                  Last detected
-                </Typography>
-
-                <Typography
-                  fontWeight={800}
-                >
-                  {animal.lastSeen}
-                </Typography>
-
-              </Box>
-
-            </Grid>
-
-          </Grid>
-
-        </Box>
-
-
-        {/* PROFILE INFO */}
-
-        <CardContent>
-
-          <Grid
-            container
-            spacing={2}
-          >
-
-            <InfoBox
-              title="Species"
-              value={animal.species}
-              icon={<Pets />}
-            />
-
-            <InfoBox
-              title="Breed"
-              value={animal.breed}
-              icon={<Science />}
-            />
-
-            <InfoBox
-              title="Age"
-              value={animal.age}
-              icon={<AccessTime />}
-            />
-
-            <InfoBox
-              title="Gender"
-              value={animal.gender}
-              icon={<Pets />}
-            />
-
-          </Grid>
-
-        </CardContent>
-
-      </Card>
-
-
-      {/* =================================================
-          ALERT
-      ================================================== */}
-
-      {animal.health !==
-        "Healthy" && (
-
-        <Alert
-          severity={
-            animal.health ===
-            "High Risk"
-              ? "error"
-              : "warning"
-          }
-          icon={<Warning />}
-          sx={{
-            mb: 3,
-            borderRadius: 3,
-            fontWeight: 700,
-          }}
-        >
-          AI Alert: {animal.alert}
-        </Alert>
-
-      )}
-
-
-      {/* =================================================
-          HEALTH METRICS
-      ================================================== */}
-
-      <Typography
-        variant="h6"
-        fontWeight={900}
-        sx={{ mb: 2 }}
-      >
-        Live Health Metrics
-      </Typography>
-
-
-      <Grid
-        container
-        spacing={2.5}
-        sx={{ mb: 4 }}
-      >
-
-        <MetricCard
-          title="Body Temperature"
-          value={`${animal.temperature}°C`}
-          subtitle="Normal range monitored"
-          icon={<Thermostat />}
-          color="#ef4444"
-          bg="#fee2e2"
-          progress={
-            animal.temperature >
-            39.5
-              ? 85
-              : 55
-          }
-        />
-
-
-        <MetricCard
-          title="Heart Rate"
-          value={`${animal.heartRate} BPM`}
-          subtitle="Live sensor reading"
-          icon={<MonitorHeart />}
-          color="#ec4899"
-          bg="#fce7f3"
-          progress={65}
-        />
-
-
-        <MetricCard
-          title="Activity"
-          value={`${animal.activity}%`}
-          subtitle="Movement level"
-          icon={<DirectionsWalk />}
-          color="#16a34a"
-          bg="#dcfce7"
-          progress={animal.activity}
-        />
-
-
-        <MetricCard
-          title="Water Intake"
-          value={`${animal.water} L`}
-          subtitle="Today's estimated intake"
-          icon={<LocalDrink />}
-          color="#2563eb"
-          bg="#dbeafe"
-          progress={72}
-        />
-
-      </Grid>
-
-
-      {/* =================================================
-          BEHAVIOUR + PRODUCTION
-      ================================================== */}
-
-      <Grid
-        container
-        spacing={2.5}
-      >
-
-        {/* BEHAVIOUR */}
-
-        <Grid
-          item
-          xs={12}
-          md={6}
-        >
-
-          <Card
-            sx={{
-              borderRadius: 4,
-              border:
-                "1px solid #e5e7eb",
-              boxShadow: "none",
-              height: "100%",
-            }}
-          >
-
-            <CardContent>
-
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent:
-                    "space-between",
-                  alignItems: "center",
-                  mb: 3,
-                }}
-              >
-
-                <Typography
-                  variant="h6"
-                  fontWeight={900}
-                >
-                  Behaviour Analysis
-                </Typography>
-
-                <Chip
-                  label="AI Vision"
-                  size="small"
-                  icon={<CameraAlt />}
-                />
-
-              </Box>
-
-
-              <BehaviourBar
-                label="Eating"
-                value={animal.eating}
-              />
-
-              <BehaviourBar
-                label="Walking"
-                value={animal.walking}
-              />
-
-              <BehaviourBar
-                label="Resting"
-                value={animal.resting}
-              />
-
-              <BehaviourBar
-                label="Overall Activity"
-                value={animal.activity}
-              />
-
-
-              <Box
-                sx={{
-                  mt: 3,
-                  p: 2,
-                  borderRadius: 3,
-                  backgroundColor:
-                    "#f0fdf4",
-                }}
-              >
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    gap: 1,
-                    alignItems:
-                      "center",
-                  }}
-                >
-
-                  <CheckCircle
-                    sx={{
-                      color:
-                        "#16a34a",
-                    }}
+              <div style={styles.imageActions}>
+                <label style={styles.changeButton}>
+                  Change Photo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    style={{ display: "none" }}
                   />
+                </label>
 
-                  <Typography
-                    fontWeight={800}
-                  >
-                    AI Behaviour Status
-                  </Typography>
-
-                </Box>
-
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mt: 0.5 }}
+                <button
+                  onClick={removeImage}
+                  style={styles.removeButton}
                 >
-                  {animal.alert}
-                </Typography>
+                  Remove
+                </button>
+              </div>
+            </div>
+          )}
 
-              </Box>
-
-            </CardContent>
-
-          </Card>
-
-        </Grid>
-
-
-        {/* PRODUCTION */}
-
-        <Grid
-          item
-          xs={12}
-          md={6}
-        >
-
-          <Card
-            sx={{
-              borderRadius: 4,
-              border:
-                "1px solid #e5e7eb",
-              boxShadow: "none",
-              height: "100%",
+          <button
+            onClick={handlePredict}
+            disabled={!image || loading}
+            style={{
+              ...styles.predictButton,
+              opacity: !image || loading ? 0.5 : 1,
+              cursor:
+                !image || loading
+                  ? "not-allowed"
+                  : "pointer",
             }}
           >
+            {loading ? "Analyzing..." : "🔍 Analyze & Predict"}
+          </button>
+        </div>
 
-            <CardContent>
+        {/* Prediction section */}
+        <div style={styles.card}>
+          <h2 style={styles.cardTitle}>
+            Prediction Result
+          </h2>
 
-              <Typography
-                variant="h6"
-                fontWeight={900}
-                sx={{ mb: 3 }}
-              >
-                Production & Consumption
-              </Typography>
+          {!prediction ? (
+            <div style={styles.empty}>
+              <div style={styles.emptyIcon}>🤖</div>
 
+              <h3 style={styles.emptyTitle}>
+                Waiting for Analysis
+              </h3>
 
-              <ProductionRow
-                icon={<LocalDrink />}
-                title="Milk Production"
-                value={
-                  animal.milk === 0
-                    ? "N/A"
-                    : `${animal.milk} L`
-                }
-                color="#2563eb"
-              />
+              <p style={styles.emptyText}>
+                Upload an animal photo and click
+                <br />
+                "Analyze & Predict"
+              </p>
+            </div>
+          ) : (
+            <div>
+              <div style={styles.resultHeader}>
+                <div style={styles.resultAnimal}>
+                  🐄
+                </div>
 
+                <div>
+                  <div style={styles.resultLabel}>
+                    Detected Animal
+                  </div>
 
-              <ProductionRow
-                icon={<Restaurant />}
-                title="Feed Consumption"
-                value={`${animal.feed} kg`}
-                color="#84cc16"
-              />
+                  <div style={styles.resultValue}>
+                    {prediction.animal}
+                  </div>
+                </div>
 
+                <div style={styles.healthy}>
+                  ✓ {prediction.health}
+                </div>
+              </div>
 
-              <ProductionRow
-                icon={<LocalDrink />}
-                title="Water Intake"
-                value={`${animal.water} L`}
-                color="#06b6d4"
-              />
+              <div style={styles.stats}>
+                <div style={styles.stat}>
+                  <span style={styles.statLabel}>
+                    Confidence
+                  </span>
 
+                  <strong style={styles.statValue}>
+                    {prediction.confidence}
+                  </strong>
+                </div>
 
-              <ProductionRow
-                icon={<Vaccines />}
-                title="Vaccination"
-                value={animal.vaccination}
-                color="#8b5cf6"
-              />
+                <div style={styles.stat}>
+                  <span style={styles.statLabel}>
+                    Temperature
+                  </span>
 
+                  <strong style={styles.statValue}>
+                    {prediction.temperature}
+                  </strong>
+                </div>
 
-              <Divider
-                sx={{ my: 2 }}
-              />
+                <div style={styles.stat}>
+                  <span style={styles.statLabel}>
+                    Activity
+                  </span>
 
+                  <strong style={styles.statValue}>
+                    {prediction.activity}
+                  </strong>
+                </div>
+              </div>
 
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: 3,
-                  backgroundColor:
-                    "#eff6ff",
-                }}
-              >
+              <div style={styles.recommendation}>
+                <div style={styles.recommendationTitle}>
+                  💡 Recommendation
+                </div>
 
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                >
-                  AI PRODUCTION INSIGHT
-                </Typography>
+                <p style={styles.recommendationText}>
+                  {prediction.recommendation}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
-                <Typography
-                  fontWeight={800}
-                  sx={{ mt: 0.5 }}
-                >
-                  {animal.milk > 20
-                    ? "Production is currently performing within the expected range."
-                    : "Production is below the expected range. Increased monitoring is recommended."}
-                </Typography>
+      <div style={styles.info}>
+        <span>ℹ️</span>
 
-              </Box>
-
-            </CardContent>
-
-          </Card>
-
-        </Grid>
-
-      </Grid>
-
-
-      {/* =================================================
-          DIGITAL TWIN TIMELINE
-      ================================================== */}
-
-      <Card
-        sx={{
-          mt: 3,
-          borderRadius: 4,
-          border:
-            "1px solid #e5e7eb",
-          boxShadow: "none",
-        }}
-      >
-
-        <CardContent>
-
-          <Typography
-            variant="h6"
-            fontWeight={900}
-            sx={{ mb: 3 }}
-          >
-            Digital Twin Timeline
-          </Typography>
-
-
-          <TimelineItem
-            time="10:42 AM"
-            title="Normal activity detected"
-            description="Animal movement and behaviour within expected range."
-            color="#16a34a"
-          />
-
-          <TimelineItem
-            time="10:18 AM"
-            title="Feed consumption recorded"
-            description={`${animal.feed} kg feed consumed.`}
-            color="#84cc16"
-          />
-
-          <TimelineItem
-            time="09:45 AM"
-            title="Health sensor updated"
-            description={`Temperature ${animal.temperature}°C • Heart rate ${animal.heartRate} BPM`}
-            color="#2563eb"
-          />
-
-          <TimelineItem
-            time="08:30 AM"
-            title="AI vision scan completed"
-            description="Animal identified and behaviour classification completed."
-            color="#8b5cf6"
-            last
-          />
-
-        </CardContent>
-
-      </Card>
-
-    </Box>
+        <span>
+          This is currently a frontend demo. The actual AI
+          prediction API can be connected when the backend is
+          ready.
+        </span>
+      </div>
+    </div>
   );
 }
 
+const styles = {
+  page: {
+    minHeight: "100vh",
+    padding: "32px",
+    background:
+      "linear-gradient(135deg, #f0fdf4 0%, #f8fafc 50%, #ecfeff 100%)",
+    boxSizing: "border-box",
+  },
 
-/* =========================================================
-   INFO BOX
-========================================================= */
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "30px",
+    gap: "20px",
+  },
 
-function InfoBox({
-  title,
-  value,
-  icon,
-}) {
-  return (
-    <Grid
-      item
-      xs={6}
-      md={3}
-    >
+  title: {
+    margin: 0,
+    fontSize: "34px",
+    fontWeight: "800",
+    color: "#14532d",
+  },
 
-      <Box
-        sx={{
-          p: 2,
-          borderRadius: 3,
-          backgroundColor:
-            "#f8fafc",
-        }}
-      >
+  subtitle: {
+    margin: "7px 0 0",
+    fontSize: "15px",
+    color: "#64748b",
+  },
 
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
-            mb: 0.5,
-          }}
-        >
+  badge: {
+    padding: "11px 18px",
+    borderRadius: "30px",
+    background: "#dcfce7",
+    color: "#166534",
+    fontWeight: "700",
+    fontSize: "14px",
+  },
 
-          <Box
-            sx={{
-              color: "#047857",
-            }}
-          >
-            {icon}
-          </Box>
+  grid: {
+    display: "grid",
+    gridTemplateColumns:
+      "minmax(300px, 1fr) minmax(300px, 1fr)",
+    gap: "24px",
+    maxWidth: "1200px",
+    margin: "0 auto",
+  },
 
-          <Typography
-            variant="caption"
-            color="text.secondary"
-          >
-            {title}
-          </Typography>
+  card: {
+    background: "rgba(255,255,255,0.95)",
+    borderRadius: "20px",
+    padding: "25px",
+    boxShadow: "0 12px 35px rgba(15,23,42,0.08)",
+    border: "1px solid #e2e8f0",
+  },
 
-        </Box>
+  cardTitle: {
+    margin: "0 0 20px",
+    fontSize: "20px",
+    fontWeight: "800",
+    color: "#1e293b",
+  },
 
-        <Typography
-          fontWeight={800}
-        >
-          {value}
-        </Typography>
+  uploadBox: {
+    minHeight: "330px",
+    border: "2px dashed #86efac",
+    borderRadius: "18px",
+    background: "#f0fdf4",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    textAlign: "center",
+    padding: "20px",
+    boxSizing: "border-box",
+  },
 
-      </Box>
+  uploadIcon: {
+    fontSize: "54px",
+    marginBottom: "10px",
+  },
 
-    </Grid>
-  );
-}
+  uploadTitle: {
+    margin: "5px 0",
+    fontSize: "20px",
+    color: "#166534",
+  },
 
+  uploadText: {
+    color: "#64748b",
+    fontSize: "14px",
+    marginBottom: "18px",
+  },
 
-/* =========================================================
-   METRIC CARD
-========================================================= */
+  uploadButton: {
+    background: "#16a34a",
+    color: "#fff",
+    padding: "11px 20px",
+    borderRadius: "10px",
+    fontWeight: "700",
+    fontSize: "14px",
+  },
 
-function MetricCard({
-  title,
-  value,
-  subtitle,
-  icon,
-  color,
-  bg,
-  progress,
-}) {
-  return (
-    <Grid
-      item
-      xs={12}
-      sm={6}
-      md={3}
-    >
+  imageContainer: {
+    width: "100%",
+    height: "330px",
+    borderRadius: "18px",
+    overflow: "hidden",
+    background: "#f1f5f9",
+  },
 
-      <Card
-        sx={{
-          borderRadius: 4,
-          border:
-            "1px solid #e5e7eb",
-          boxShadow: "none",
-          height: "100%",
-        }}
-      >
+  preview: {
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+  },
 
-        <CardContent>
+  imageActions: {
+    display: "flex",
+    gap: "10px",
+    marginTop: "12px",
+  },
 
-          <Avatar
-            sx={{
-              backgroundColor: bg,
-              color: color,
-              mb: 2,
-            }}
-          >
-            {icon}
-          </Avatar>
+  changeButton: {
+    flex: 1,
+    textAlign: "center",
+    padding: "11px",
+    borderRadius: "10px",
+    background: "#e0f2fe",
+    color: "#0369a1",
+    fontWeight: "700",
+    cursor: "pointer",
+  },
 
+  removeButton: {
+    padding: "11px 18px",
+    border: "none",
+    borderRadius: "10px",
+    background: "#fee2e2",
+    color: "#b91c1c",
+    fontWeight: "700",
+    cursor: "pointer",
+  },
 
-          <Typography
-            variant="body2"
-            color="text.secondary"
-          >
-            {title}
-          </Typography>
+  predictButton: {
+    width: "100%",
+    marginTop: "18px",
+    padding: "14px",
+    border: "none",
+    borderRadius: "12px",
+    background:
+      "linear-gradient(135deg, #16a34a, #15803d)",
+    color: "#fff",
+    fontSize: "16px",
+    fontWeight: "800",
+  },
 
+  empty: {
+    minHeight: "390px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    textAlign: "center",
+  },
 
-          <Typography
-            variant="h5"
-            fontWeight={900}
-            sx={{ mt: 0.3 }}
-          >
-            {value}
-          </Typography>
+  emptyIcon: {
+    fontSize: "60px",
+    marginBottom: "15px",
+  },
 
+  emptyTitle: {
+    margin: 0,
+    color: "#334155",
+    fontSize: "20px",
+  },
 
-          <Typography
-            variant="caption"
-            color="text.secondary"
-          >
-            {subtitle}
-          </Typography>
+  emptyText: {
+    color: "#94a3b8",
+    lineHeight: "1.7",
+    fontSize: "14px",
+  },
 
+  resultHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
+    padding: "15px",
+    borderRadius: "14px",
+    background: "#f0fdf4",
+  },
 
-          <LinearProgress
-            variant="determinate"
-            value={progress}
-            sx={{
-              mt: 2,
-              height: 6,
-              borderRadius: 5,
-              backgroundColor:
-                "#e5e7eb",
+  resultAnimal: {
+    width: "55px",
+    height: "55px",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#dcfce7",
+    fontSize: "30px",
+  },
 
-              "& .MuiLinearProgress-bar":
-                {
-                  backgroundColor:
-                    color,
-                  borderRadius: 5,
-                },
-            }}
-          />
+  resultLabel: {
+    fontSize: "12px",
+    color: "#64748b",
+  },
 
-        </CardContent>
+  resultValue: {
+    fontSize: "22px",
+    fontWeight: "800",
+    color: "#166534",
+    marginTop: "3px",
+  },
 
-      </Card>
+  healthy: {
+    marginLeft: "auto",
+    padding: "7px 12px",
+    borderRadius: "20px",
+    background: "#dcfce7",
+    color: "#15803d",
+    fontSize: "13px",
+    fontWeight: "800",
+  },
 
-    </Grid>
-  );
-}
+  stats: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: "10px",
+    marginTop: "18px",
+  },
 
+  stat: {
+    padding: "14px",
+    background: "#f8fafc",
+    borderRadius: "12px",
+    textAlign: "center",
+  },
 
-/* =========================================================
-   BEHAVIOUR BAR
-========================================================= */
+  statLabel: {
+    display: "block",
+    color: "#64748b",
+    fontSize: "11px",
+    marginBottom: "6px",
+  },
 
-function BehaviourBar({
-  label,
-  value,
-}) {
-  return (
-    <Box sx={{ mb: 2.5 }}>
+  statValue: {
+    color: "#0f172a",
+    fontSize: "15px",
+  },
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent:
-            "space-between",
-          mb: 0.6,
-        }}
-      >
+  recommendation: {
+    marginTop: "18px",
+    padding: "16px",
+    borderRadius: "14px",
+    background: "#fffbeb",
+    border: "1px solid #fde68a",
+  },
 
-        <Typography
-          variant="body2"
-          fontWeight={700}
-        >
-          {label}
-        </Typography>
+  recommendationTitle: {
+    fontWeight: "800",
+    color: "#92400e",
+    fontSize: "14px",
+  },
 
-        <Typography
-          variant="body2"
-          fontWeight={800}
-        >
-          {value}%
-        </Typography>
+  recommendationText: {
+    color: "#78350f",
+    fontSize: "13px",
+    lineHeight: "1.6",
+    marginBottom: 0,
+  },
 
-      </Box>
+  info: {
+    maxWidth: "1200px",
+    margin: "22px auto 0",
+    padding: "14px 18px",
+    borderRadius: "12px",
+    background: "#eff6ff",
+    color: "#1e40af",
+    fontSize: "13px",
+    display: "flex",
+    gap: "10px",
+    alignItems: "center",
+  },
+};
 
-      <LinearProgress
-        variant="determinate"
-        value={value}
-        sx={{
-          height: 8,
-          borderRadius: 5,
-          backgroundColor:
-            "#e5e7eb",
-
-          "& .MuiLinearProgress-bar":
-            {
-              borderRadius: 5,
-              background:
-                "linear-gradient(90deg, #10b981, #06b6d4)",
-            },
-        }}
-      />
-
-    </Box>
-  );
-}
-
-
-/* =========================================================
-   PRODUCTION ROW
-========================================================= */
-
-function ProductionRow({
-  icon,
-  title,
-  value,
-  color,
-}) {
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent:
-          "space-between",
-        mb: 2,
-      }}
-    >
-
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1.5,
-        }}
-      >
-
-        <Avatar
-          sx={{
-            width: 38,
-            height: 38,
-            backgroundColor:
-              `${color}20`,
-            color: color,
-          }}
-        >
-          {icon}
-        </Avatar>
-
-        <Typography
-          fontWeight={700}
-        >
-          {title}
-        </Typography>
-
-      </Box>
-
-
-      <Typography
-        fontWeight={900}
-        color={color}
-      >
-        {value}
-      </Typography>
-
-    </Box>
-  );
-}
-
-
-/* =========================================================
-   TIMELINE
-========================================================= */
-
-function TimelineItem({
-  time,
-  title,
-  description,
-  color,
-  last,
-}) {
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        gap: 2,
-        minHeight: last
-          ? "auto"
-          : 85,
-      }}
-    >
-
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection:
-            "column",
-          alignItems: "center",
-        }}
-      >
-
-        <Box
-          sx={{
-            width: 13,
-            height: 13,
-            borderRadius: "50%",
-            backgroundColor:
-              color,
-            boxShadow:
-              `0 0 0 5px ${color}20`,
-          }}
-        />
-
-        {!last && (
-          <Box
-            sx={{
-              width: 2,
-              flex: 1,
-              backgroundColor:
-                "#e5e7eb",
-              mt: 1,
-            }}
-          />
-        )}
-
-      </Box>
-
-
-      <Box sx={{ pb: 2 }}>
-
-        <Typography
-          variant="caption"
-          color="text.secondary"
-        >
-          {time}
-        </Typography>
-
-        <Typography
-          fontWeight={800}
-        >
-          {title}
-        </Typography>
-
-        <Typography
-          variant="body2"
-          color="text.secondary"
-        >
-          {description}
-        </Typography>
-
-      </Box>
-
-    </Box>
-  );
-}
+export default DigitalTwin;
