@@ -1,28 +1,65 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from app.core.config import CORS_ORIGINS
 from app.models import User, Farm, Animal
 
-from app.api.animals.routes import router as animal_router
 from app.api.auth.routes import router as auth_router
-
+from app.api.farms.routes import router as farms_router
+from app.api.animals.routes import router as animals_router
+from app.api.milk.routes import router as milk_router
+from app.api.health.routes import router as health_router
 from app.database.connection import engine
 
 
 app = FastAPI(
     title="AgroLens PLF API",
+    description="AI Powered Precision Livestock Farming System",
     version="1.0.0",
-    description="AI Powered Precision Livestock Farming System"
 )
 
 
-# Register API routers
-app.include_router(animal_router)
-app.include_router(auth_router)
+# ============================================================
+# ROUTERS
+# ============================================================
 
+app.include_router(
+    auth_router
+)
+
+app.include_router(
+    farms_router
+)
+
+app.include_router(
+    animals_router
+)
+
+app.include_router(
+    milk_router
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
+app.include_router(
+    health_router
+)
+
+
+# ============================================================
+# HOME
+# ============================================================
 
 @app.get("/")
 def home():
+
     return {
         "project": "AgroLens PLF",
         "status": "Running",

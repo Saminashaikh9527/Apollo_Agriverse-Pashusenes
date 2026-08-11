@@ -1,61 +1,65 @@
-from sqlalchemy import Column, Integer, String, Numeric, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.database.base import Base
 
 
 class Farm(Base):
-    
     __tablename__ = "farms"
 
-    farm_id = Column(
+    farm_id: Mapped[int] = mapped_column(
         Integer,
         primary_key=True,
-        index=True
+        index=True,
     )
 
-    user_id = Column(
+    user_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("users.user_id", ondelete="CASCADE"),
-        nullable=False
+        nullable=False,
     )
 
-    farm_name = Column(
+    farm_name: Mapped[str] = mapped_column(
         String(100),
-        nullable=False
+        nullable=False,
     )
 
-    village = Column(
-        String(100)
+    village: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
     )
 
-    district = Column(
-        String(100)
+    district: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
     )
 
-    state = Column(
-        String(100)
+    state: Mapped[str | None] = mapped_column(
+        String(100),
+        nullable=True,
     )
 
-    total_land = Column(
-        Numeric(8, 2)
+    total_land: Mapped[float | None] = mapped_column(
+        Numeric(8, 2),
+        nullable=True,
     )
 
-    created_at = Column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime,
-        server_default=func.now()
+        nullable=True,
+        server_default=func.now(),
     )
 
-    # Relationship with User
     user = relationship(
         "User",
-        back_populates="farms"
+        back_populates="farms",
     )
 
-    # Relationship with Animals
     animals = relationship(
         "Animal",
         back_populates="farm",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
     )

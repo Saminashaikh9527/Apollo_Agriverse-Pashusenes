@@ -1,22 +1,29 @@
-from pydantic import BaseModel
 from datetime import date, datetime
-from typing import Optional
+
+from pydantic import BaseModel, ConfigDict
 
 
 class AnimalCreate(BaseModel):
     farm_id: int
     tag_number: str
     species: str
-    breed: Optional[str] = None
-    gender: Optional[str] = None
-    birth_date: Optional[date] = None
-    weight: Optional[float] = None
-    status: Optional[str] = "Healthy"
+    breed: str | None = None
+    gender: str | None = None
+    birth_date: date | None = None
+    weight: float | None = None
+    status: str = "Healthy"
 
 
-class AnimalResponse(AnimalCreate):
+class AnimalResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     animal_id: int
+    farm_id: int
+    tag_number: str
+    species: str
+    breed: str | None = None
+    gender: str | None = None
+    birth_date: date | None = None
+    weight: float | None = None
+    status: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True

@@ -1,82 +1,140 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
+from app.core.security import (
+    create_access_token,
+    hash_password,
+    verify_password,
+)
+
 from app.models.user import User
-from app.schemas.user import UserCreate, UserResponse, LoginRequest, Token
-from app.core.security import hash_password, verify_password, create_access_token
+
+from app.schemas.user import (
+    UserCreate,
+    LoginRequest,
+)
 
 
 router = APIRouter(
     prefix="/auth",
-    tags=["Authentication"]
+    tags=["Authentication"],
 )
 
 
-@router.post("/register", response_model=UserResponse)
+# ============================================================
+# REGISTER
+# ============================================================
+
+@router.post("/register")
 def register(
-    user: UserCreate,
-    db: Session = Depends(get_db)
+    user_data: UserCreate,
+    db: Session = Depends(get_db),
 ):
 
-    existing_user = db.query(User).filter(
-        User.email == user.email
-    ).first()
+    # --------------------------------------------------------
+    # Check email
+    # --------------------------------------------------------
+
+    existing_user = (
+        db.query(User)
+        .filter(
+            User.email == user_data.email
+        )
+        .first()
+    )
 
     if existing_user:
+
         raise HTTPException(
-            status_code=400,
-            detail="Email already registered"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered",
         )
 
+    # --------------------------------------------------------
+    # Create user
+    # --------------------------------------------------------
+
     new_user = User(
-        full_name=user.full_name,
-        email=user.email,
-        phone=user.phone,
-        password_hash=hash_password(user.password),
-        role="farmer"
+        full_name=user_data.full_name,
+        email=user_data.email,
+        phone=user_data.phone,
+        password_hash=hash_password(
+            user_data.password
+        ),
+        role="farmer",
     )
 
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
-    return new_user
+    return {
+        "message": "User registered successfully",
+        "user_id": new_user.user_id,
+    }
 
 
-@router.post("/login", response_model=Token)
+# ============================================================
+# LOGIN
+# ============================================================
+
+@router.post("/login")
 def login(
-    user: LoginRequest,
-    db: Session = Depends(get_db)
+    login_data: LoginRequest,
+    db: Session = Depends(get_db),
 ):
 
-    db_user = db.query(User).filter(
-        User.email == user.email
-    ).first()
+    # --------------------------------------------------------
+    # Find user
+    # --------------------------------------------------------
 
-    if not db_user:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid email or password"
+    user = (
+        db.query(User)
+        .filter(
+            User.email == login_data.email
         )
-
-    if not verify_password(
-        user.password,
-        db_user.password_hash
-    ):
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid email or password"
-        )
-
-    token = create_access_token(
-        {
-            "user_id": db_user.user_id,
-            "role": db_user.role
-        }
+        .first()
     )
 
+    if user is None:
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    # --------------------------------------------------------
+    # Verify password
+    # --------------------------------------------------------
+
+    if not verify_password(
+        login_data.password,
+        user.password_hash,
+    ):
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    # --------------------------------------------------------
+    # CREATE JWT
+    #
+    # IMPORTANT:
+    # Pass user_id and role separately.
+    # --------------------------------------------------------
+
+    access_token = create_access_token(
+        user_id=user.user_id,
+        role=user.role,
+    )
+
+    # --------------------------------------------------------
+    # Return token
+    # --------------------------------------------------------
+
     return {
-        "access_token": token,
-        "token_type": "bearer"
+        "access_token": access_token,
+        "token_type": "bearer",
     }
