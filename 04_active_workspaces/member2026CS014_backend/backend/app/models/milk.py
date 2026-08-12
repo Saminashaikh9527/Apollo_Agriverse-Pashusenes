@@ -2,6 +2,7 @@ from datetime import date, datetime
 
 from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
 
 from app.database.base import Base
 
@@ -28,14 +29,14 @@ class MilkProduction(Base):
 
     morning_litres: Mapped[float] = mapped_column(
         Float,
-        nullable=False,
+        nullable=True,
         default=0,
         server_default="0",
     )
 
     evening_litres: Mapped[float] = mapped_column(
         Float,
-        nullable=False,
+        nullable=True,
         default=0,
         server_default="0",
     )
@@ -45,9 +46,10 @@ class MilkProduction(Base):
         nullable=False,
     )
 
-    created_at: Mapped[datetime] = mapped_column(
+    created_at: Mapped[datetime | None] = mapped_column(
         DateTime,
-        nullable=False,
+        nullable=True,
+        server_default=func.now(),
     )
 
     animal = relationship(

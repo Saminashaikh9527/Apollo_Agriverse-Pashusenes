@@ -10,11 +10,7 @@ from app.database.base import Base
 class Farm(Base):
     __tablename__ = "farms"
 
-    farm_id: Mapped[int] = mapped_column(
-        Integer,
-        primary_key=True,
-        index=True,
-    )
+    farm_id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
     user_id: Mapped[int] = mapped_column(
         Integer,
