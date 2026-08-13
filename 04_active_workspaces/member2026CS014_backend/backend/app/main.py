@@ -11,10 +11,25 @@ from app.api.animals.routes import router as animals_router
 from app.api.farms.routes import router as farms_router
 from app.api.health.routes import router as health_router
 from app.api.milk.routes import router as milk_router
-from app.api.wool.routes import router as wool_router
-from app.api.vaccination.routes import router as vaccination_router
-from app.api.feed.routes import router as feed_router
-from app.api.egg.routes import router as egg_router
+try:
+    from app.api.wool.routes import router as wool_router
+except ModuleNotFoundError:
+    wool_router = None
+
+try:
+    from app.api.vaccination.routes import router as vaccination_router
+except ModuleNotFoundError:
+    vaccination_router = None
+
+try:
+    from app.api.feed.routes import router as feed_router
+except ModuleNotFoundError:
+    feed_router = None
+
+try:
+    from app.api.egg.routes import router as egg_router
+except ModuleNotFoundError:
+    egg_router = None
 from app.core.config import CORS_ORIGINS
 import app.models  # Register all SQLAlchemy models before handling requests.
 from app.database.connection import engine
@@ -78,29 +93,21 @@ app.include_router(
     tags=["Milk Production"],
 )
 
-app.include_router(
-    wool_router,
-    prefix="/api",
-    tags=["Wool Management"],
-)
+if wool_router is not None:
+    app.include_router(wool_router, prefix="/api", tags=["Wool Management"])
 
-app.include_router(
-    vaccination_router,
-    prefix="/api",
-    tags=["Vaccination Management"],
-)
+if vaccination_router is not None:
+    app.include_router(
+        vaccination_router,
+        prefix="/api",
+        tags=["Vaccination Management"],
+    )
 
-app.include_router(
-    feed_router,
-    prefix="/api",
-    tags=["Feed Management"],
-)
+if feed_router is not None:
+    app.include_router(feed_router, prefix="/api", tags=["Feed Management"])
 
-app.include_router(
-    egg_router,
-    prefix="/api",
-    tags=["Egg Production"],
-)
+if egg_router is not None:
+    app.include_router(egg_router, prefix="/api", tags=["Egg Production"])
 
 
 # ============================================================

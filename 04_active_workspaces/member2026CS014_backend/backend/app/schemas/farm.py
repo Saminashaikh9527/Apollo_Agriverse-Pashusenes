@@ -1,17 +1,32 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+from typing import Optional
 
+
+# ============================================================
+# CREATE FARM
+# ============================================================
 
 class FarmCreate(BaseModel):
     farm_name: str
-    village: str
-    district: str
-    state: str
-    total_land: float
+    village: Optional[str] = None
+    district: Optional[str] = None
+    state: Optional[str] = None
+    total_land: Optional[float] = None
 
 
-class FarmResponse(FarmCreate):
+# ============================================================
+# FARM RESPONSE
+# ============================================================
+
+class FarmResponse(BaseModel):
     farm_id: int
     user_id: int
+    farm_name: str
+    village: Optional[str] = None
+    district: Optional[str] = None
+    state: Optional[str] = None
+    total_land: Optional[float] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(
+        from_attributes=True
+    )
