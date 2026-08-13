@@ -18,6 +18,13 @@ class FeedRecord(Base):
         index=True
     )
 
+    recorded_by_user_id = Column(
+        Integer,
+        ForeignKey("users.user_id"),
+        nullable=False,
+        index=True,
+    )
+
     feed_date = Column(Date, nullable=False)
 
     feed_type = Column(String(100), nullable=False)
@@ -37,3 +44,5 @@ class FeedRecord(Base):
         "Animal",
         back_populates="feed_records",
     )
+
+    recorded_by = relationship("User")
