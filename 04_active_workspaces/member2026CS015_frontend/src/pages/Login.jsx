@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { loginUser } from "../api/backend";
 
 function Login() {
   const navigate = useNavigate();
@@ -8,41 +9,114 @@ function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
+
+    console.log("LOGIN BUTTON CLICKED");
+
     setError("");
 
-    // Frontend-only login.
-    // Backend can be connected later by your group member.
-    if (!email.trim() || !password.trim()) {
-      setError("Please enter email and password.");
+    if (!email.trim()) {
+      setError("Please enter your email.");
       return;
     }
 
-    // Temporary frontend login
-    localStorage.setItem("isLoggedIn", "true");
-    localStorage.setItem("userEmail", email);
+    if (!password.trim()) {
+      setError("Please enter your password.");
+      return;
+    }
 
-    navigate("/dashboard");
+    setLoading(true);
+
+    try {
+      /*
+       * IMPORTANT
+       *
+       * loginUser expects ONE OBJECT.
+       */
+
+      const data = await loginUser({
+        email: email.trim(),
+        password: password,
+      });
+
+      console.log("LOGIN SUCCESS:", data);
+
+      /* =========================================
+         SAVE LOGIN INFORMATION
+      ========================================= */
+
+      if (data?.access_token) {
+        localStorage.setItem(
+          "access_token",
+          data.access_token
+        );
+
+        localStorage.setItem(
+          "token",
+          data.access_token
+        );
+      }
+
+      localStorage.setItem(
+        "isLoggedIn",
+        "true"
+      );
+
+      localStorage.setItem(
+        "userEmail",
+        email.trim()
+      );
+
+      if (data?.user) {
+        localStorage.setItem(
+          "user",
+          JSON.stringify(data.user)
+        );
+      }
+
+      /* =========================================
+         GO TO DASHBOARD
+      ========================================= */
+
+      navigate("/dashboard");
+
+    } catch (err) {
+      console.error("LOGIN ERROR:", err);
+
+      setError(
+        err?.message ||
+          "Login failed. Please check your email and password."
+      );
+
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div style={styles.page}>
-      {/* Background decoration */}
-      <div style={styles.backgroundOverlay}></div>
 
-      <div style={styles.backgroundCircleOne}></div>
-      <div style={styles.backgroundCircleTwo}></div>
-      <div style={styles.backgroundCircleThree}></div>
+      {/* Background */}
+      <div style={styles.backgroundOverlay} />
 
-      {/* Main container */}
+      <div style={styles.backgroundCircleOne} />
+      <div style={styles.backgroundCircleTwo} />
+      <div style={styles.backgroundCircleThree} />
+
+      {/* Main */}
       <div style={styles.container}>
 
-        {/* LEFT SIDE */}
+        {/* =========================================
+            LEFT SIDE
+        ========================================= */}
+
         <div style={styles.leftSection}>
 
           <div style={styles.brandSection}>
+
             <h1 style={styles.projectName}>
               Apollo AgriVerse-Pashusense
             </h1>
@@ -50,9 +124,11 @@ function Login() {
             <p style={styles.tagline}>
               Smarter farms. Healthier livestock. Better decisions.
             </p>
+
           </div>
 
           <div style={styles.heroContent}>
+
             <div style={styles.iconCircle}>
               🐄
             </div>
@@ -60,42 +136,66 @@ function Login() {
             <h2 style={styles.heroTitle}>
               Welcome to your
               <br />
+
               <span style={styles.heroHighlight}>
                 digital livestock farm
               </span>
             </h2>
 
             <p style={styles.heroText}>
-              Monitor your livestock, manage farms, track production
-              and make smarter farming decisions from one platform.
+              Monitor your livestock, manage farms,
+              track production and make smarter farming
+              decisions from one platform.
             </p>
+
           </div>
 
           <div style={styles.features}>
+
             <div style={styles.feature}>
-              <span style={styles.featureIcon}>🌱</span>
-              <span>Smart Farm Management</span>
+              <span style={styles.featureIcon}>
+                🌱
+              </span>
+
+              <span>
+                Smart Farm Management
+              </span>
             </div>
 
             <div style={styles.feature}>
-              <span style={styles.featureIcon}>🐄</span>
-              <span>Livestock Monitoring</span>
+              <span style={styles.featureIcon}>
+                🐄
+              </span>
+
+              <span>
+                Livestock Monitoring
+              </span>
             </div>
 
             <div style={styles.feature}>
-              <span style={styles.featureIcon}>📊</span>
-              <span>Data-Driven Insights</span>
+              <span style={styles.featureIcon}>
+                📊
+              </span>
+
+              <span>
+                Data-Driven Insights
+              </span>
             </div>
+
           </div>
 
         </div>
 
-        {/* RIGHT SIDE - LOGIN */}
+        {/* =========================================
+            RIGHT SIDE
+        ========================================= */}
+
         <div style={styles.rightSection}>
 
           <div style={styles.loginCard}>
 
             <div style={styles.loginHeader}>
+
               <div style={styles.loginIcon}>
                 🔐
               </div>
@@ -107,17 +207,21 @@ function Login() {
               <p style={styles.loginSubtitle}>
                 Sign in to continue to your farm dashboard
               </p>
+
             </div>
 
             <form onSubmit={handleLogin}>
 
               {/* EMAIL */}
+
               <div style={styles.inputGroup}>
+
                 <label style={styles.label}>
                   Email Address
                 </label>
 
                 <div style={styles.inputWrapper}>
+
                   <span style={styles.inputIcon}>
                     ✉️
                   </span>
@@ -126,46 +230,69 @@ function Login() {
                     type="email"
                     placeholder="Enter your email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) =>
+                      setEmail(e.target.value)
+                    }
                     style={styles.input}
                     autoComplete="email"
+                    disabled={loading}
                   />
+
                 </div>
+
               </div>
 
               {/* PASSWORD */}
+
               <div style={styles.inputGroup}>
+
                 <label style={styles.label}>
                   Password
                 </label>
 
                 <div style={styles.inputWrapper}>
+
                   <span style={styles.inputIcon}>
                     🔒
                   </span>
 
                   <input
-                    type={showPassword ? "text" : "password"}
+                    type={
+                      showPassword
+                        ? "text"
+                        : "password"
+                    }
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) =>
+                      setPassword(e.target.value)
+                    }
                     style={styles.input}
                     autoComplete="current-password"
+                    disabled={loading}
                   />
 
                   <button
                     type="button"
                     onClick={() =>
-                      setShowPassword(!showPassword)
+                      setShowPassword(
+                        !showPassword
+                      )
                     }
                     style={styles.passwordButton}
+                    disabled={loading}
                   >
-                    {showPassword ? "🙈" : "👁️"}
+                    {showPassword
+                      ? "🙈"
+                      : "👁️"}
                   </button>
+
                 </div>
+
               </div>
 
               {/* ERROR */}
+
               {error && (
                 <div style={styles.error}>
                   {error}
@@ -173,13 +300,21 @@ function Login() {
               )}
 
               {/* OPTIONS */}
+
               <div style={styles.options}>
+
                 <label style={styles.remember}>
+
                   <input
                     type="checkbox"
                     style={styles.checkbox}
+                    disabled={loading}
                   />
-                  <span>Remember me</span>
+
+                  <span>
+                    Remember me
+                  </span>
+
                 </label>
 
                 <button
@@ -187,36 +322,62 @@ function Login() {
                   style={styles.forgotButton}
                   onClick={() =>
                     setError(
-                      "Password reset will be available when the backend is connected."
+                      "Password reset is not available yet."
                     )
                   }
+                  disabled={loading}
                 >
                   Forgot password?
                 </button>
+
               </div>
 
-              {/* LOGIN BUTTON */}
+              {/* LOGIN */}
+
               <button
                 type="submit"
-                style={styles.loginButton}
+                style={{
+                  ...styles.loginButton,
+                  opacity: loading ? 0.7 : 1,
+                  cursor: loading
+                    ? "not-allowed"
+                    : "pointer",
+                }}
+                disabled={loading}
               >
-                <span>Sign In</span>
-                <span style={styles.arrow}>
-                  →
+
+                <span>
+                  {loading
+                    ? "Signing In..."
+                    : "Sign In"}
                 </span>
+
+                {!loading && (
+                  <span style={styles.arrow}>
+                    →
+                  </span>
+                )}
+
               </button>
 
             </form>
 
+            {/* SECURITY */}
+
             <div style={styles.divider}>
-              <span style={styles.dividerLine}></span>
+
+              <span style={styles.dividerLine} />
+
               <span style={styles.dividerText}>
                 Secure Access
               </span>
-              <span style={styles.dividerLine}></span>
+
+              <span style={styles.dividerLine} />
+
             </div>
 
             <div style={styles.security}>
+
               <span style={styles.securityIcon}>
                 🛡️
               </span>
@@ -224,22 +385,52 @@ function Login() {
               <span>
                 Your farm data is protected
               </span>
+
+            </div>
+
+            {/* REGISTER */}
+
+            <div style={styles.registerSection}>
+
+              <span style={styles.registerText}>
+                Don't have an account?
+              </span>
+
+              <button
+                type="button"
+                onClick={() =>
+                  navigate("/register")
+                }
+                style={styles.registerButton}
+                disabled={loading}
+              >
+                Create Account
+              </button>
+
             </div>
 
           </div>
 
         </div>
+
       </div>
 
       {/* FOOTER */}
+
       <div style={styles.footer}>
         © 2026 Apollo AgriVerse-Pashusense
       </div>
+
     </div>
   );
 }
 
+/* =========================================================
+   STYLES
+========================================================= */
+
 const styles = {
+
   page: {
     minHeight: "100vh",
     width: "100%",
@@ -267,7 +458,8 @@ const styles = {
     width: "500px",
     height: "500px",
     borderRadius: "50%",
-    background: "rgba(255,255,255,0.06)",
+    background:
+      "rgba(255,255,255,0.06)",
     top: "-200px",
     left: "-180px",
     zIndex: 1,
@@ -278,7 +470,8 @@ const styles = {
     width: "420px",
     height: "420px",
     borderRadius: "50%",
-    background: "rgba(165,214,167,0.12)",
+    background:
+      "rgba(165,214,167,0.12)",
     bottom: "-180px",
     right: "-120px",
     zIndex: 1,
@@ -289,7 +482,8 @@ const styles = {
     width: "180px",
     height: "180px",
     borderRadius: "50%",
-    background: "rgba(255,255,255,0.08)",
+    background:
+      "rgba(255,255,255,0.08)",
     top: "18%",
     right: "34%",
     zIndex: 1,
@@ -300,23 +494,26 @@ const styles = {
     maxWidth: "1180px",
     minHeight: "650px",
     display: "grid",
-    gridTemplateColumns: "1.15fr 0.85fr",
+    gridTemplateColumns:
+      "1.15fr 0.85fr",
     borderRadius: "28px",
     overflow: "hidden",
     position: "relative",
     zIndex: 5,
     boxShadow:
       "0 30px 80px rgba(0,0,0,0.28)",
-    background: "rgba(255,255,255,0.12)",
+    background:
+      "rgba(255,255,255,0.12)",
     backdropFilter: "blur(16px)",
-    WebkitBackdropFilter: "blur(16px)",
-    border: "1px solid rgba(255,255,255,0.22)",
+    WebkitBackdropFilter:
+      "blur(16px)",
+    border:
+      "1px solid rgba(255,255,255,0.22)",
   },
 
-  /* LEFT */
-
   leftSection: {
-    padding: "55px 55px 45px",
+    padding:
+      "55px 55px 45px",
     display: "flex",
     flexDirection: "column",
     justifyContent: "space-between",
@@ -344,7 +541,8 @@ const styles = {
     lineHeight: 1.5,
     fontWeight: 500,
     letterSpacing: "0.2px",
-    color: "rgba(255,255,255,0.78)",
+    color:
+      "rgba(255,255,255,0.78)",
   },
 
   heroContent: {
@@ -359,8 +557,10 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     fontSize: "36px",
-    background: "rgba(255,255,255,0.13)",
-    border: "1px solid rgba(255,255,255,0.20)",
+    background:
+      "rgba(255,255,255,0.13)",
+    border:
+      "1px solid rgba(255,255,255,0.20)",
     boxShadow:
       "0 12px 30px rgba(0,0,0,0.12)",
   },
@@ -382,7 +582,8 @@ const styles = {
     margin: 0,
     fontSize: "15px",
     lineHeight: 1.7,
-    color: "rgba(255,255,255,0.76)",
+    color:
+      "rgba(255,255,255,0.76)",
   },
 
   features: {
@@ -397,7 +598,8 @@ const styles = {
     alignItems: "center",
     gap: "12px",
     fontSize: "14px",
-    color: "rgba(255,255,255,0.88)",
+    color:
+      "rgba(255,255,255,0.88)",
   },
 
   featureIcon: {
@@ -407,11 +609,10 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "rgba(255,255,255,0.11)",
+    background:
+      "rgba(255,255,255,0.11)",
     fontSize: "16px",
   },
-
-  /* RIGHT */
 
   rightSection: {
     padding: "40px",
@@ -477,7 +678,6 @@ const styles = {
     border: "1px solid #d8e2dc",
     borderRadius: "13px",
     background: "#ffffff",
-    transition: "all 0.2s ease",
     overflow: "hidden",
   },
 
@@ -608,11 +808,43 @@ const styles = {
     fontSize: "13px",
   },
 
+  registerSection: {
+    marginTop: "20px",
+    textAlign: "center",
+    borderTop: "1px solid #e3e9e5",
+    paddingTop: "18px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "10px",
+  },
+
+  registerText: {
+    fontSize: "12px",
+    color: "#7a8783",
+    fontWeight: 500,
+  },
+
+  registerButton: {
+    background:
+      "linear-gradient(135deg, #2d9b5f, #4caf50)",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "8px",
+    padding: "8px 20px",
+    fontSize: "12px",
+    fontWeight: 700,
+    cursor: "pointer",
+    boxShadow:
+      "0 6px 16px rgba(45, 155, 95, 0.2)",
+  },
+
   footer: {
     position: "absolute",
     bottom: "12px",
     zIndex: 10,
-    color: "rgba(255,255,255,0.65)",
+    color:
+      "rgba(255,255,255,0.65)",
     fontSize: "10px",
   },
 };

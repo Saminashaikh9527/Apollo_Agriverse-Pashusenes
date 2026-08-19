@@ -1,1028 +1,1040 @@
-import { useState } from "react";
-
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Box,
-  Typography,
+  Button,
   Card,
   CardContent,
-  Grid,
-  Avatar,
   Chip,
-  Button,
-  LinearProgress,
-  TextField,
-  MenuItem,
-  Stack,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
-  Alert,
+  Grid,
+  IconButton,
+  MenuItem,
+  Paper,
+  Snackbar,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
 } from "@mui/material";
 
+import AddIcon from "@mui/icons-material/Add";
+import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
+import RestaurantIcon from "@mui/icons-material/Restaurant";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import CloseIcon from "@mui/icons-material/Close";
 import {
-  Restaurant,
-  Pets,
-  WaterDrop,
-  TrendingUp,
-  Warning,
-  CheckCircle,
-  Inventory,
-  Grass,
-  Scale,
-  Add,
-} from "@mui/icons-material";
+  createFeedRecord,
+  deleteFeedRecord,
+  getFeedRecords,
+  updateFeedRecord,
+} from "../api/feed";
+import { getAnimals } from "../api/animals";
 
+const initialForm = {
+  animal_id: "",
+  feed_date: "",
+  feed_type: "",
+  quantity_kg: "",
+  cost: "",
+  notes: "",
+};
 
-const animals = [
-  {
-    tag: "COW001",
-    name: "Lakshmi",
-    species: "Cow",
-    emoji: "🐄",
-    target: 10,
-    consumed: 9.2,
-    water: 42,
-    status: "Normal",
-  },
+function getToday() {
+  const date = new Date();
 
-  {
-    tag: "COW002",
-    name: "Ganga",
-    species: "Cow",
-    emoji: "🐄",
-    target: 11,
-    consumed: 10.1,
-    water: 46,
-    status: "Normal",
-  },
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
 
-  {
-    tag: "COW023",
-    name: "Kamadhenu",
-    species: "Cow",
-    emoji: "🐄",
-    target: 10,
-    consumed: 7.5,
-    water: 31,
-    status: "Low Intake",
-  },
+  return `${year}-${month}-${day}`;
+}
 
-  {
-    tag: "BUF001",
-    name: "Nandini",
-    species: "Buffalo",
-    emoji: "🐃",
-    target: 12,
-    consumed: 11.2,
-    water: 51,
-    status: "Normal",
-  },
+function formatDate(value) {
+  if (!value) {
+    return "-";
+  }
 
-  {
-    tag: "GOAT001",
-    name: "Chikki",
-    species: "Goat",
-    emoji: "🐐",
-    target: 2.5,
-    consumed: 2.1,
-    water: 8,
-    status: "Normal",
-  },
+  const date = new Date(value);
 
-  {
-    tag: "SHE012",
-    name: "Moti",
-    species: "Sheep",
-    emoji: "🐑",
-    target: 2.2,
-    consumed: 1.8,
-    water: 5,
-    status: "Low Intake",
-  },
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
 
-  {
-    tag: "HEN001",
-    name: "Ruby",
-    species: "Chicken",
-    emoji: "🐔",
-    target: 0.15,
-    consumed: 0.12,
-    water: 0.25,
-    status: "Normal",
-  },
-];
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
 
+function formatCurrency(value) {
+  const number = Number(value || 0);
+
+  return `₹${number.toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  })}`;
+}
 
 export default function Feed() {
+  const [feedRecords, setFeedRecords] = useState([]);
+  const [animals, setAnimals] = useState([]);
 
-  const [selectedAnimal, setSelectedAnimal] =
-    useState("ALL");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const [feedType, setFeedType] =
-    useState("Cattle Feed");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
-  const [quantity, setQuantity] =
-    useState("10");
+  const [form, setForm] = useState({
+    ...initialForm,
+    feed_date: getToday(),
+  });
 
+  const [search, setSearch] = useState("");
 
-  const filteredAnimals =
-    selectedAnimal === "ALL"
-      ? animals
-      : animals.filter(
-          (animal) =>
-            animal.tag === selectedAnimal
-        );
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
+  const [error, setError] = useState("");
 
-  const totalFeed =
-    animals.reduce(
-      (sum, animal) =>
-        sum + animal.consumed,
+  const showMessage = (message, severity = "success") => {
+    setSnackbar({
+      open: true,
+      message,
+      severity,
+    });
+  };
+
+  const closeSnackbar = () => {
+    setSnackbar((previous) => ({
+      ...previous,
+      open: false,
+    }));
+  };
+
+  const loadAnimals = async () => {
+    try {
+      const data = await getAnimals();
+
+      setAnimals(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Animals loading error:", err);
+
+      showMessage(
+        err.message || "Unable to load animals.",
+        "error"
+      );
+    }
+  };
+
+  const loadFeedRecords = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const data = await getFeedRecords();
+
+      setFeedRecords(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Feed loading error:", err);
+
+      setError(err.message || "Unable to load feed records.");
+
+      setFeedRecords([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAnimals();
+    loadFeedRecords();
+  }, []);
+
+  const getAnimal = (animalId) => {
+    return animals.find(
+      (animal) => Number(animal.animal_id) === Number(animalId)
+    );
+  };
+
+  const getAnimalLabel = (animalId) => {
+    const animal = getAnimal(animalId);
+
+    if (!animal) {
+      return `Animal #${animalId}`;
+    }
+
+    return `${animal.tag_number} - ${animal.species}`;
+  };
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  };
+
+  const openAddDialog = () => {
+    setEditingId(null);
+
+    setForm({
+      ...initialForm,
+      feed_date: getToday(),
+    });
+
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (record) => {
+    setEditingId(record.feed_id);
+
+    setForm({
+      animal_id: record.animal_id ?? "",
+      feed_date: record.feed_date ?? getToday(),
+      feed_type: record.feed_type ?? "",
+      quantity_kg: record.quantity_kg ?? "",
+      cost: record.cost ?? "",
+      notes: record.notes ?? "",
+    });
+
+    setDialogOpen(true);
+  };
+
+  const closeDialog = () => {
+    if (saving) {
+      return;
+    }
+
+    setDialogOpen(false);
+    setEditingId(null);
+
+    setForm({
+      ...initialForm,
+      feed_date: getToday(),
+    });
+  };
+
+  const validateForm = () => {
+    if (!form.animal_id) {
+      showMessage("Please select an animal.", "warning");
+      return false;
+    }
+
+    if (!form.feed_date) {
+      showMessage("Please select a feed date.", "warning");
+      return false;
+    }
+
+    if (!form.feed_type.trim()) {
+      showMessage("Please enter feed type.", "warning");
+      return false;
+    }
+
+    if (
+      form.quantity_kg === "" ||
+      Number(form.quantity_kg) <= 0
+    ) {
+      showMessage(
+        "Quantity must be greater than 0 kg.",
+        "warning"
+      );
+
+      return false;
+    }
+
+    if (
+      form.cost !== "" &&
+      Number(form.cost) < 0
+    ) {
+      showMessage(
+        "Cost cannot be negative.",
+        "warning"
+      );
+
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!validateForm()) {
+      return;
+    }
+
+    setSaving(true);
+
+    const payload = {
+      animal_id: Number(form.animal_id),
+      feed_date: form.feed_date,
+      feed_type: form.feed_type.trim(),
+      quantity_kg: Number(form.quantity_kg),
+      cost:
+        form.cost === ""
+          ? 0
+          : Number(form.cost),
+      notes: form.notes.trim(),
+    };
+
+    try {
+      const isEditing = editingId !== null;
+      if (isEditing) await updateFeedRecord(editingId, payload);
+      else await createFeedRecord(payload);
+
+      showMessage(
+        isEditing
+          ? "Feed record updated successfully."
+          : "Feed record added successfully.",
+        "success"
+      );
+
+      closeDialog();
+      await loadFeedRecords();
+    } catch (err) {
+      console.error("Save feed error:", err);
+
+      showMessage(
+        err.message || "Unable to save feed record.",
+        "error"
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (feedId) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this feed record?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteFeedRecord(feedId);
+
+      showMessage(
+        "Feed record deleted successfully.",
+        "success"
+      );
+
+      await loadFeedRecords();
+    } catch (err) {
+      console.error("Delete feed error:", err);
+
+      showMessage(
+        err.message || "Unable to delete feed record.",
+        "error"
+      );
+    }
+  };
+
+  const filteredRecords = useMemo(() => {
+    const query = search.trim().toLowerCase();
+
+    if (!query) {
+      return feedRecords;
+    }
+
+    return feedRecords.filter((record) => {
+      const animal = getAnimal(record.animal_id);
+
+      const values = [
+        record.feed_id,
+        record.animal_id,
+        record.feed_type,
+        record.quantity_kg,
+        record.cost,
+        record.notes,
+        record.feed_date,
+        animal?.tag_number,
+        animal?.species,
+      ];
+
+      return values.some((value) =>
+        String(value ?? "")
+          .toLowerCase()
+          .includes(query)
+      );
+    });
+  }, [feedRecords, search, animals]);
+
+  const totalQuantity = useMemo(() => {
+    return feedRecords.reduce(
+      (total, record) =>
+        total + Number(record.quantity_kg || 0),
       0
     );
+  }, [feedRecords]);
 
-
-  const totalTarget =
-    animals.reduce(
-      (sum, animal) =>
-        sum + animal.target,
+  const totalCost = useMemo(() => {
+    return feedRecords.reduce(
+      (total, record) =>
+        total + Number(record.cost || 0),
       0
     );
+  }, [feedRecords]);
 
+  const averageQuantity = useMemo(() => {
+    if (feedRecords.length === 0) {
+      return 0;
+    }
 
-  const feedEfficiency =
-    Math.round(
-      (totalFeed / totalTarget) * 100
-    );
-
-
-  const lowIntake =
-    animals.filter(
-      (animal) =>
-        animal.status === "Low Intake"
-    ).length;
-
+    return totalQuantity / feedRecords.length;
+  }, [feedRecords, totalQuantity]);
 
   return (
     <Box
       sx={{
-        minHeight: "100vh",
-        backgroundColor: "#f6faf8",
+        width: "100%",
+        minHeight: "100%",
         p: {
           xs: 2,
-          sm: 3,
-          md: 4,
+          md: 3,
         },
       }}
     >
-
-      {/* =====================================================
-          HEADER
-      ====================================================== */}
-
+      {/* Header */}
       <Box
         sx={{
           display: "flex",
-          justifyContent:
-            "space-between",
+          justifyContent: "space-between",
           alignItems: {
             xs: "flex-start",
             md: "center",
           },
-          flexWrap: "wrap",
+          flexDirection: {
+            xs: "column",
+            md: "row",
+          },
           gap: 2,
-          mb: 4,
+          mb: 3,
         }}
       >
-
         <Box>
-
-          <Typography
-            variant="h4"
-            fontWeight={900}
-            color="#12372a"
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            sx={{ mb: 0.5 }}
           >
-            Feed Management 🌱
-          </Typography>
+            <RestaurantIcon color="primary" />
+
+            <Typography
+              variant="h4"
+              component="h1"
+              fontWeight={700}
+            >
+              Feed Management
+            </Typography>
+          </Stack>
 
           <Typography
+            variant="body1"
             color="text.secondary"
-            sx={{ mt: 0.5 }}
           >
-            Monitor feed consumption,
-            nutrition and livestock
-            feeding patterns.
+            Track animal feed quantity, type and daily feeding costs.
           </Typography>
-
         </Box>
 
-
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          sx={{
-            borderRadius: 3,
-            textTransform: "none",
-            fontWeight: 800,
-            backgroundColor:
-              "#047857",
-            px: 3,
-            "&:hover": {
-              backgroundColor:
-                "#065f46",
-            },
-          }}
+        <Stack
+          direction="row"
+          spacing={1}
         >
-          Add Feed Record
-        </Button>
+          <Button
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={loadFeedRecords}
+            disabled={loading}
+          >
+            Refresh
+          </Button>
 
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={openAddDialog}
+          >
+            Add Feed Record
+          </Button>
+        </Stack>
       </Box>
 
-
-      {/* =====================================================
-          SUMMARY CARDS
-      ====================================================== */}
-
-      <Grid
-        container
-        spacing={2.5}
-        sx={{ mb: 4 }}
-      >
-
-        <SummaryCard
-          title="Today's Feed"
-          value={`${totalFeed.toFixed(1)} kg`}
-          subtitle="Total consumed"
-          icon={<Restaurant />}
-          background="#dcfce7"
-          color="#15803d"
-        />
-
-        <SummaryCard
-          title="Target Feed"
-          value={`${totalTarget.toFixed(1)} kg`}
-          subtitle="Daily requirement"
-          icon={<Scale />}
-          background="#dbeafe"
-          color="#2563eb"
-        />
-
-        <SummaryCard
-          title="Feed Efficiency"
-          value={`${feedEfficiency}%`}
-          subtitle="Consumption vs target"
-          icon={<TrendingUp />}
-          background="#fef3c7"
-          color="#d97706"
-        />
-
-        <SummaryCard
-          title="Low Intake"
-          value={lowIntake}
-          subtitle="Animals need attention"
-          icon={<Warning />}
-          background="#fee2e2"
-          color="#dc2626"
-        />
-
-      </Grid>
-
-
-      {/* =====================================================
-          FILTER
-      ====================================================== */}
-
-      <Card
-        sx={{
-          borderRadius: 4,
-          mb: 3,
-          boxShadow: "none",
-          border:
-            "1px solid #e5e7eb",
-        }}
-      >
-
-        <CardContent>
-
-          <Grid
-            container
-            spacing={2}
-            alignItems="center"
-          >
-
-            <Grid
-              item
-              xs={12}
-              md={5}
-            >
-
-              <TextField
-                select
-                fullWidth
-                label="Select Animal"
-                value={selectedAnimal}
-                onChange={(e) =>
-                  setSelectedAnimal(
-                    e.target.value
-                  )
-                }
-              >
-
-                <MenuItem value="ALL">
-                  🐾 All Animals
-                </MenuItem>
-
-                {animals.map(
-                  (animal) => (
-                    <MenuItem
-                      key={animal.tag}
-                      value={animal.tag}
-                    >
-                      {animal.emoji}{" "}
-                      {animal.tag} —{" "}
-                      {animal.name}
-                    </MenuItem>
-                  )
-                )}
-
-              </TextField>
-
-            </Grid>
-
-
-            <Grid
-              item
-              xs={12}
-              md={7}
-            >
-
-              <Stack
-                direction="row"
-                spacing={1}
-                flexWrap="wrap"
-                useFlexGap
-              >
-
-                <Chip
-                  icon={<Grass />}
-                  label="Balanced Diet"
-                  color="success"
-                  variant="outlined"
-                />
-
-                <Chip
-                  icon={<WaterDrop />}
-                  label="Water Monitoring"
-                  color="primary"
-                  variant="outlined"
-                />
-
-                <Chip
-                  icon={<CheckCircle />}
-                  label="AI Nutrition"
-                  color="secondary"
-                  variant="outlined"
-                />
-
-              </Stack>
-
-            </Grid>
-
-          </Grid>
-
-        </CardContent>
-
-      </Card>
-
-
-      {/* =====================================================
-          ALERT
-      ====================================================== */}
-
-      {lowIntake > 0 && (
-
+      {/* Error */}
+      {error && (
         <Alert
-          severity="warning"
-          icon={<Warning />}
-          sx={{
-            mb: 3,
-            borderRadius: 3,
-            fontWeight: 700,
-          }}
+          severity="error"
+          sx={{ mb: 3 }}
+          action={
+            <Button
+              color="inherit"
+              size="small"
+              onClick={loadFeedRecords}
+            >
+              Retry
+            </Button>
+          }
         >
-          AI detected reduced feed intake
-          in {lowIntake} animal(s). Check
-          their health and feeding behaviour.
+          {error}
         </Alert>
-
       )}
 
-
-      {/* =====================================================
-          ANIMAL FEED CARDS
-      ====================================================== */}
-
-      <Typography
-        variant="h6"
-        fontWeight={900}
-        sx={{ mb: 2 }}
-      >
-        Animal Feed Status
-      </Typography>
-
-
+      {/* Summary Cards */}
       <Grid
         container
-        spacing={2.5}
+        spacing={2}
+        sx={{ mb: 3 }}
       >
-
-        {filteredAnimals.map(
-          (animal) => {
-
-            const percentage =
-              Math.min(
-                Math.round(
-                  (animal.consumed /
-                    animal.target) *
-                    100
-                ),
-                100
-              );
-
-
-            return (
-              <Grid
-                item
-                xs={12}
-                md={6}
-                lg={4}
-                key={animal.tag}
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card>
+            <CardContent>
+              <Typography
+                variant="body2"
+                color="text.secondary"
               >
+                Feed Records
+              </Typography>
 
-                <Card
-                  sx={{
-                    borderRadius: 4,
-                    height: "100%",
-                    boxShadow: "none",
-                    border:
-                      "1px solid #e5e7eb",
-                  }}
-                >
+              <Typography
+                variant="h4"
+                fontWeight={700}
+                sx={{ mt: 1 }}
+              >
+                {feedRecords.length}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
 
-                  <CardContent>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card>
+            <CardContent>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+              >
+                Total Feed
+              </Typography>
 
-                    {/* Animal Header */}
+              <Typography
+                variant="h4"
+                fontWeight={700}
+                sx={{ mt: 1 }}
+              >
+                {totalQuantity.toFixed(2)} kg
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
 
-                    <Box
-                      sx={{
-                        display: "flex",
-                        justifyContent:
-                          "space-between",
-                        alignItems:
-                          "center",
-                        mb: 3,
-                      }}
-                    >
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card>
+            <CardContent>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+              >
+                Total Cost
+              </Typography>
 
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems:
-                            "center",
-                          gap: 1.5,
-                        }}
-                      >
+              <Typography
+                variant="h4"
+                fontWeight={700}
+                sx={{ mt: 1 }}
+              >
+                {formatCurrency(totalCost)}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
 
-                        <Avatar
-                          sx={{
-                            width: 52,
-                            height: 52,
-                            fontSize: 30,
-                            backgroundColor:
-                              "#dcfce7",
-                          }}
-                        >
-                          {animal.emoji}
-                        </Avatar>
+        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+          <Card>
+            <CardContent>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+              >
+                Avg. Quantity
+              </Typography>
 
-                        <Box>
-
-                          <Typography
-                            fontWeight={900}
-                          >
-                            {animal.tag}
-                          </Typography>
-
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                          >
-                            {animal.name}
-                          </Typography>
-
-                        </Box>
-
-                      </Box>
-
-
-                      <Chip
-                        size="small"
-                        label={
-                          animal.status
-                        }
-                        icon={
-                          animal.status ===
-                          "Normal"
-                            ? <CheckCircle />
-                            : <Warning />
-                        }
-                        sx={{
-                          fontWeight: 700,
-                          backgroundColor:
-                            animal.status ===
-                            "Normal"
-                              ? "#dcfce7"
-                              : "#fef3c7",
-                          color:
-                            animal.status ===
-                            "Normal"
-                              ? "#166534"
-                              : "#92400e",
-                        }}
-                      />
-
-                    </Box>
-
-
-                    {/* Consumption */}
-
-                    <Box sx={{ mb: 3 }}>
-
-                      <Box
-                        sx={{
-                          display:
-                            "flex",
-                          justifyContent:
-                            "space-between",
-                          mb: 1,
-                        }}
-                      >
-
-                        <Typography
-                          variant="body2"
-                          fontWeight={700}
-                        >
-                          Feed Consumption
-                        </Typography>
-
-                        <Typography
-                          variant="body2"
-                          fontWeight={900}
-                        >
-                          {animal.consumed} /
-                          {" "}
-                          {animal.target} kg
-                        </Typography>
-
-                      </Box>
-
-
-                      <LinearProgress
-                        variant="determinate"
-                        value={
-                          percentage
-                        }
-                        sx={{
-                          height: 9,
-                          borderRadius: 5,
-                          backgroundColor:
-                            "#e5e7eb",
-
-                          "& .MuiLinearProgress-bar":
-                            {
-                              borderRadius: 5,
-                              backgroundColor:
-                                percentage >=
-                                90
-                                  ? "#16a34a"
-                                  : percentage >=
-                                    70
-                                  ? "#f59e0b"
-                                  : "#ef4444",
-                            },
-                        }}
-                      />
-
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                      >
-                        {percentage}%
-                        of daily target
-                      </Typography>
-
-                    </Box>
-
-
-                    <Divider
-                      sx={{ mb: 2 }}
-                    />
-
-
-                    {/* Stats */}
-
-                    <Grid
-                      container
-                      spacing={1.5}
-                    >
-
-                      <FeedStat
-                        icon={<Restaurant />}
-                        title="Consumed"
-                        value={`${animal.consumed} kg`}
-                      />
-
-                      <FeedStat
-                        icon={<Scale />}
-                        title="Target"
-                        value={`${animal.target} kg`}
-                      />
-
-                      <FeedStat
-                        icon={<WaterDrop />}
-                        title="Water"
-                        value={`${animal.water} L`}
-                      />
-
-                      <FeedStat
-                        icon={<Pets />}
-                        title="Species"
-                        value={animal.species}
-                      />
-
-                    </Grid>
-
-
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      sx={{
-                        mt: 2.5,
-                        borderRadius: 2.5,
-                        textTransform:
-                          "none",
-                        fontWeight: 800,
-                      }}
-                    >
-                      View Feed History
-                    </Button>
-
-                  </CardContent>
-
-                </Card>
-
-              </Grid>
-            );
-          }
-        )}
-
+              <Typography
+                variant="h4"
+                fontWeight={700}
+                sx={{ mt: 1 }}
+              >
+                {averageQuantity.toFixed(2)} kg
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
 
-
-      {/* =====================================================
-          FEED ENTRY
-      ====================================================== */}
-
-      <Card
+      {/* Main Table Card */}
+      <Paper
+        elevation={1}
         sx={{
-          mt: 4,
-          borderRadius: 4,
-          boxShadow: "none",
-          border:
-            "1px solid #e5e7eb",
+          width: "100%",
+          overflow: "hidden",
         }}
       >
-
-        <CardContent>
-
-          <Typography
-            variant="h6"
-            fontWeight={900}
-            sx={{ mb: 3 }}
-          >
-            Record New Feed Entry
-          </Typography>
-
-
-          <Grid
-            container
-            spacing={2}
-            alignItems="center"
-          >
-
-            <Grid
-              item
-              xs={12}
-              md={4}
-            >
-
-              <TextField
-                select
-                fullWidth
-                label="Feed Type"
-                value={feedType}
-                onChange={(e) =>
-                  setFeedType(
-                    e.target.value
-                  )
-                }
-              >
-
-                <MenuItem value="Cattle Feed">
-                  🌾 Cattle Feed
-                </MenuItem>
-
-                <MenuItem value="Green Fodder">
-                  🌱 Green Fodder
-                </MenuItem>
-
-                <MenuItem value="Dry Fodder">
-                  🌾 Dry Fodder
-                </MenuItem>
-
-                <MenuItem value="Mineral Mix">
-                  🧂 Mineral Mix
-                </MenuItem>
-
-                <MenuItem value="Concentrate">
-                  🥣 Concentrate
-                </MenuItem>
-
-              </TextField>
-
-            </Grid>
-
-
-            <Grid
-              item
-              xs={12}
-              md={4}
-            >
-
-              <TextField
-                fullWidth
-                type="number"
-                label="Quantity (kg)"
-                value={quantity}
-                onChange={(e) =>
-                  setQuantity(
-                    e.target.value
-                  )
-                }
-              />
-
-            </Grid>
-
-
-            <Grid
-              item
-              xs={12}
-              md={4}
-            >
-
-              <Button
-                fullWidth
-                variant="contained"
-                startIcon={<Add />}
-                sx={{
-                  height: 56,
-                  borderRadius: 2.5,
-                  fontWeight: 800,
-                  backgroundColor:
-                    "#047857",
-                  "&:hover": {
-                    backgroundColor:
-                      "#065f46",
-                  },
-                }}
-              >
-                Record Feed
-              </Button>
-
-            </Grid>
-
-          </Grid>
-
-        </CardContent>
-
-      </Card>
-
-
-      {/* =====================================================
-          AI INSIGHT
-      ====================================================== */}
-
-      <Card
-        sx={{
-          mt: 4,
-          borderRadius: 4,
-          background:
-            "linear-gradient(135deg, #064e3b, #047857)",
-          color: "white",
-        }}
-      >
-
-        <CardContent sx={{ p: 3 }}>
-
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 2,
-            }}
-          >
-
-            <Avatar
-              sx={{
-                backgroundColor:
-                  "rgba(255,255,255,0.15)",
-              }}
-            >
-              🤖
-            </Avatar>
-
-            <Box>
-
-              <Typography
-                variant="h6"
-                fontWeight={900}
-              >
-                AI Nutrition Insight
-              </Typography>
-
-              <Typography
-                sx={{
-                  opacity: 0.85,
-                  mt: 0.5,
-                }}
-              >
-                Feed consumption is being
-                monitored against animal
-                requirements. Animals with
-                reduced intake can be
-                automatically flagged for
-                health investigation.
-              </Typography>
-
-            </Box>
-
-          </Box>
-
-        </CardContent>
-
-      </Card>
-
-    </Box>
-  );
-}
-
-
-/* =====================================================
-   SUMMARY CARD
-===================================================== */
-
-function SummaryCard({
-  title,
-  value,
-  subtitle,
-  icon,
-  background,
-  color,
-}) {
-
-  return (
-    <Grid
-      item
-      xs={12}
-      sm={6}
-      md={3}
-    >
-
-      <Card
-        sx={{
-          borderRadius: 4,
-          boxShadow: "none",
-          border:
-            "1px solid #e5e7eb",
-        }}
-      >
-
-        <CardContent>
-
-          <Avatar
-            sx={{
-              backgroundColor:
-                background,
-              color: color,
-              mb: 2,
-            }}
-          >
-            {icon}
-          </Avatar>
-
-
-          <Typography
-            variant="body2"
-            color="text.secondary"
-          >
-            {title}
-          </Typography>
-
-
-          <Typography
-            variant="h5"
-            fontWeight={900}
-            sx={{ mt: 0.3 }}
-          >
-            {value}
-          </Typography>
-
-
-          <Typography
-            variant="caption"
-            color="text.secondary"
-          >
-            {subtitle}
-          </Typography>
-
-        </CardContent>
-
-      </Card>
-
-    </Grid>
-  );
-}
-
-
-/* =====================================================
-   FEED STAT
-===================================================== */
-
-function FeedStat({
-  icon,
-  title,
-  value,
-}) {
-
-  return (
-    <Grid
-      item
-      xs={6}
-    >
-
-      <Box
-        sx={{
-          p: 1.5,
-          borderRadius: 2.5,
-          backgroundColor:
-            "#f8fafc",
-        }}
-      >
-
         <Box
           sx={{
+            p: 2,
             display: "flex",
-            alignItems: "center",
-            gap: 0.7,
-            mb: 0.5,
+            justifyContent: "space-between",
+            alignItems: {
+              xs: "stretch",
+              md: "center",
+            },
+            flexDirection: {
+              xs: "column",
+              md: "row",
+            },
+            gap: 2,
           }}
         >
-
-          <Box
-            sx={{
-              color: "#047857",
-              display: "flex",
-            }}
-          >
-            {icon}
-          </Box>
-
           <Typography
-            variant="caption"
-            color="text.secondary"
+            variant="h6"
+            fontWeight={700}
           >
-            {title}
+            Feed Records
           </Typography>
 
+          <TextField
+            size="small"
+            label="Search"
+            placeholder="Search animal, feed type..."
+            value={search}
+            onChange={(event) =>
+              setSearch(event.target.value)
+            }
+            sx={{
+              minWidth: {
+                xs: "100%",
+                md: 300,
+              },
+            }}
+          />
         </Box>
 
+        <Divider />
 
-        <Typography
-          fontWeight={900}
+        {loading ? (
+          <Box
+            sx={{
+              minHeight: 300,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <CircularProgress />
+          </Box>
+        ) : filteredRecords.length === 0 ? (
+          <Box
+            sx={{
+              minHeight: 300,
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              alignItems: "center",
+              p: 3,
+            }}
+          >
+            <RestaurantIcon
+              sx={{
+                fontSize: 60,
+                color: "text.disabled",
+                mb: 1,
+              }}
+            />
+
+            <Typography
+              variant="h6"
+              color="text.secondary"
+            >
+              No feed records found
+            </Typography>
+
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ mt: 0.5, mb: 2 }}
+            >
+              Add your first feed record.
+            </Typography>
+
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={openAddDialog}
+            >
+              Add Feed Record
+            </Button>
+          </Box>
+        ) : (
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>
+                    <strong>ID</strong>
+                  </TableCell>
+
+                  <TableCell>
+                    <strong>Animal</strong>
+                  </TableCell>
+
+                  <TableCell>
+                    <strong>Date</strong>
+                  </TableCell>
+
+                  <TableCell>
+                    <strong>Feed Type</strong>
+                  </TableCell>
+
+                  <TableCell align="right">
+                    <strong>Quantity</strong>
+                  </TableCell>
+
+                  <TableCell align="right">
+                    <strong>Cost</strong>
+                  </TableCell>
+
+                  <TableCell>
+                    <strong>Notes</strong>
+                  </TableCell>
+
+                  <TableCell align="center">
+                    <strong>Actions</strong>
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+
+              <TableBody>
+                {filteredRecords.map((record) => (
+                  <TableRow
+                    key={record.feed_id}
+                    hover
+                  >
+                    <TableCell>
+                      #{record.feed_id}
+                    </TableCell>
+
+                    <TableCell>
+                      <Stack spacing={0.5}>
+                        <Typography
+                          variant="body2"
+                          fontWeight={600}
+                        >
+                          {getAnimalLabel(record.animal_id)}
+                        </Typography>
+
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                        >
+                          Animal ID: {record.animal_id}
+                        </Typography>
+                      </Stack>
+                    </TableCell>
+
+                    <TableCell>
+                      {formatDate(record.feed_date)}
+                    </TableCell>
+
+                    <TableCell>
+                      <Chip
+                        label={record.feed_type || "-"}
+                        size="small"
+                        variant="outlined"
+                      />
+                    </TableCell>
+
+                    <TableCell align="right">
+                      {Number(
+                        record.quantity_kg || 0
+                      ).toFixed(2)}{" "}
+                      kg
+                    </TableCell>
+
+                    <TableCell align="right">
+                      {formatCurrency(record.cost)}
+                    </TableCell>
+
+                    <TableCell>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          maxWidth: 250,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={record.notes || ""}
+                      >
+                        {record.notes || "-"}
+                      </Typography>
+                    </TableCell>
+
+                    <TableCell align="center">
+                      <Stack
+                        direction="row"
+                        spacing={0.5}
+                        justifyContent="center"
+                      >
+                        <IconButton
+                          color="primary"
+                          size="small"
+                          onClick={() =>
+                            openEditDialog(record)
+                          }
+                          title="Edit"
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+
+                        <IconButton
+                          color="error"
+                          size="small"
+                          onClick={() =>
+                            handleDelete(record.feed_id)
+                          }
+                          title="Delete"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+      </Paper>
+
+      {/* Add / Edit Dialog */}
+      <Dialog
+        open={dialogOpen}
+        onClose={closeDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          {editingId !== null
+            ? "Edit Feed Record"
+            : "Add Feed Record"}
+
+          <IconButton
+            onClick={closeDialog}
+            disabled={saving}
+            sx={{
+              position: "absolute",
+              right: 8,
+              top: 8,
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
         >
-          {value}
-        </Typography>
+          <DialogContent dividers>
+            <Grid
+              container
+              spacing={2}
+            >
+              {/* Animal */}
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  select
+                  fullWidth
+                  required
+                  label="Animal"
+                  name="animal_id"
+                  value={form.animal_id}
+                  onChange={handleChange}
+                  disabled={saving}
+                >
+                  <MenuItem value="">
+                    Select animal
+                  </MenuItem>
 
-      </Box>
+                  {animals.map((animal) => (
+                    <MenuItem
+                      key={animal.animal_id}
+                      value={animal.animal_id}
+                    >
+                      {animal.tag_number} -{" "}
+                      {animal.species}{" "}
+                      {animal.breed
+                        ? `(${animal.breed})`
+                        : ""}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
 
-    </Grid>
+              {/* Date */}
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  fullWidth
+                  required
+                  type="date"
+                  label="Feed Date"
+                  name="feed_date"
+                  value={form.feed_date}
+                  onChange={handleChange}
+                  disabled={saving}
+                  InputLabelProps={{
+                    shrink: true,
+                  }}
+                />
+              </Grid>
+
+              {/* Feed Type */}
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  fullWidth
+                  required
+                  label="Feed Type"
+                  name="feed_type"
+                  value={form.feed_type}
+                  onChange={handleChange}
+                  disabled={saving}
+                  placeholder="e.g. Green Fodder"
+                />
+              </Grid>
+
+              {/* Quantity */}
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  fullWidth
+                  required
+                  type="number"
+                  label="Quantity (kg)"
+                  name="quantity_kg"
+                  value={form.quantity_kg}
+                  onChange={handleChange}
+                  disabled={saving}
+                  inputProps={{
+                    min: 0,
+                    step: 0.01,
+                  }}
+                />
+              </Grid>
+
+              {/* Cost */}
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Cost (₹)"
+                  name="cost"
+                  value={form.cost}
+                  onChange={handleChange}
+                  disabled={saving}
+                  inputProps={{
+                    min: 0,
+                    step: 0.01,
+                  }}
+                />
+              </Grid>
+
+              {/* Notes */}
+              <Grid size={{ xs: 12 }}>
+                <TextField
+                  fullWidth
+                  multiline
+                  minRows={3}
+                  label="Notes"
+                  name="notes"
+                  value={form.notes}
+                  onChange={handleChange}
+                  disabled={saving}
+                  placeholder="Additional feeding notes..."
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+
+          <DialogActions sx={{ p: 2 }}>
+            <Button
+              onClick={closeDialog}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={saving}
+              startIcon={
+                saving ? (
+                  <CircularProgress
+                    size={18}
+                    color="inherit"
+                  />
+                ) : (
+                  <AddIcon />
+                )
+              }
+            >
+              {saving
+                ? "Saving..."
+                : editingId !== null
+                  ? "Update Record"
+                  : "Save Record"}
+            </Button>
+          </DialogActions>
+        </Box>
+      </Dialog>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={closeSnackbar}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "right",
+        }}
+      >
+        <Alert
+          onClose={closeSnackbar}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 }

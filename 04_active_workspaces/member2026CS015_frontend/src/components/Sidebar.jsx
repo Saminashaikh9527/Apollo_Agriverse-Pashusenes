@@ -6,7 +6,7 @@ import {
   ListItemIcon,
   ListItemText,
   Toolbar,
-  Typography
+  Typography,
 } from "@mui/material";
 
 import {
@@ -21,7 +21,7 @@ import {
   Assessment,
   SmartToy,
   Psychology,
-  Settings
+  Settings,
 } from "@mui/icons-material";
 
 import { NavLink } from "react-router-dom";
@@ -30,63 +30,63 @@ const menuItems = [
   {
     name: "Dashboard",
     path: "/dashboard",
-    icon: <Dashboard />
+    icon: <Dashboard />,
   },
   {
     name: "Farms",
     path: "/farms",
-    icon: <Agriculture />
+    icon: <Agriculture />,
   },
   {
     name: "Animals",
     path: "/animals",
-    icon: <Pets />
+    icon: <Pets />,
   },
   {
     name: "Digital Twin",
     path: "/digital-twin",
-    icon: <AccountTree />
+    icon: <AccountTree />,
   },
   {
     name: "Feed",
     path: "/feed",
-    icon: <Grass />
+    icon: <Grass />,
   },
   {
     name: "Milk",
     path: "/milk",
-    icon: <LocalDrink />
+    icon: <LocalDrink />,
   },
   {
     name: "Eggs",
     path: "/eggs",
-    icon: <Egg />
+    icon: <Egg />,
   },
   {
     name: "Wool",
     path: "/wool",
-    icon: <ContentCut />
+    icon: <ContentCut />,
   },
   {
     name: "Reports",
     path: "/reports",
-    icon: <Assessment />
+    icon: <Assessment />,
   },
   {
     name: "AI Monitoring",
     path: "/ai-monitoring",
-    icon: <SmartToy />
+    icon: <SmartToy />,
   },
   {
     name: "Predictions",
     path: "/predictions",
-    icon: <Psychology />
+    icon: <Psychology />,
   },
   {
     name: "Settings",
     path: "/settings",
-    icon: <Settings />
-  }
+    icon: <Settings />,
+  },
 ];
 
 export default function Sidebar() {
@@ -100,8 +100,8 @@ export default function Sidebar() {
           width: 250,
           backgroundColor: "#1b5e20",
           color: "white",
-          boxSizing: "border-box"
-        }
+          boxSizing: "border-box",
+        },
       }}
     >
       {/* Logo */}
@@ -110,7 +110,7 @@ export default function Sidebar() {
           variant="h6"
           fontWeight="bold"
           sx={{
-            fontSize: "20px"
+            fontSize: "20px",
           }}
         >
           🌱 AgroLens PLF
@@ -134,35 +134,34 @@ export default function Sidebar() {
                 minHeight: "48px",
 
                 "&:hover": {
-                  backgroundColor: "rgba(255,255,255,0.15)"
+                  backgroundColor: "rgba(255,255,255,0.15)",
                 },
 
                 "&.active": {
                   backgroundColor: "white",
                   color: "#1b5e20",
-                  fontWeight: "bold"
+                  fontWeight: "bold",
                 },
 
                 "&.active .MuiListItemIcon-root": {
-                  color: "#1b5e20"
-                }
+                  color: "#1b5e20",
+                },
+
+                "&.active .MuiTypography-root": {
+                  fontWeight: "bold",
+                },
               }}
             >
               <ListItemIcon
                 sx={{
                   color: "white",
-                  minWidth: 40
+                  minWidth: 40,
                 }}
               >
                 {item.icon}
               </ListItemIcon>
 
-              <ListItemText
-                primary={item.name}
-                primaryTypographyProps={{
-                  fontWeight: "inherit"
-                }}
-              />
+              <ListItemText primary={item.name} />
             </ListItemButton>
           </ListItem>
         ))}

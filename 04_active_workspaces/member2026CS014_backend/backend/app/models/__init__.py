@@ -7,7 +7,7 @@ from app.models.wool import WoolRecord
 from app.models.vaccination import VaccinationRecord
 from app.models.egg import EggProduction
 from app.models.feed import FeedRecord
-
+from app.models.growth import GrowthRecord
 __all__ = [
     "User",
     "Farm",

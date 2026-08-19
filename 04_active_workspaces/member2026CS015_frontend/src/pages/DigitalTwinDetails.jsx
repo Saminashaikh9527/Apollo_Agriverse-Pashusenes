@@ -318,7 +318,7 @@ function DigitalTwinDetails() {
                 sx={{ mt: 2 }}
               >
 
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
 
                   <Typography
                     variant="caption"
@@ -337,7 +337,7 @@ function DigitalTwinDetails() {
                 </Grid>
 
 
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
 
                   <Typography
                     variant="caption"
@@ -356,7 +356,7 @@ function DigitalTwinDetails() {
                 </Grid>
 
 
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
 
                   <Typography
                     variant="caption"
@@ -375,7 +375,7 @@ function DigitalTwinDetails() {
                 </Grid>
 
 
-                <Grid item xs={6} sm={3}>
+                <Grid size={{ xs: 6, sm: 3 }}>
 
                   <Typography
                     variant="caption"

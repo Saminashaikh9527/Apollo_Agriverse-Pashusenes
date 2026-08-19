@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Farms from "./pages/Farms";
 import Animals from "./pages/Animals";
@@ -20,6 +21,9 @@ import Reports from "./pages/Reports";
 import AIMonitoring from "./pages/AIMonitoring";
 import Predictions from "./pages/Predictions";
 import Settings from "./pages/Settings";
+import Vaccination from "./pages/Vaccination";
+import Health from "./pages/Health";
+import Growth from "./pages/Growth";
 
 import MainLayout from "./layouts/MainLayout";
 
@@ -34,6 +38,12 @@ function App() {
         <Route
           path="/"
           element={<Login />}
+        />
+
+        {/* REGISTER */}
+        <Route
+          path="/register"
+          element={<Register />}
         />
 
         {/* DASHBOARD */}
@@ -115,6 +125,18 @@ function App() {
             </MainLayout>
           }
         />
+
+        <Route
+          path="/vaccination"
+          element={
+            <MainLayout>
+              <Vaccination />
+            </MainLayout>
+          }
+        />
+
+        <Route path="/health" element={<MainLayout><Health /></MainLayout>} />
+        <Route path="/growth" element={<MainLayout><Growth /></MainLayout>} />
 
         {/* REPORTS */}
         <Route

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import {
   Box,
@@ -15,8 +15,9 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  MenuItem,
   Divider,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 
 import {
@@ -27,185 +28,239 @@ import {
   Pets,
   Grass,
   LocalDrink,
-  Egg,
-  Edit,
   Delete,
   Visibility,
-  WaterDrop,
   Sensors,
 } from "@mui/icons-material";
 
+import {
+  getFarms as fetchFarms,
+  createFarm,
+  deleteFarm as deleteAPI,
+} from "../api/farms";
 
-const initialFarms = [
-  {
-    id: 1,
-    name: "Green Valley Farm",
-    location: "Pune, Maharashtra",
-    type: "Mixed Livestock",
-    animals: 48,
-    cows: 18,
-    buffaloes: 8,
-    goats: 12,
-    sheep: 6,
-    chickens: 4,
-    milk: "126 L/day",
-    status: "Healthy",
-    area: "12 Acres",
-  },
-
-  {
-    id: 2,
-    name: "Shree Krishna Dairy",
-    location: "Nashik, Maharashtra",
-    type: "Dairy Farm",
-    animals: 32,
-    cows: 24,
-    buffaloes: 8,
-    goats: 0,
-    sheep: 0,
-    chickens: 0,
-    milk: "182 L/day",
-    status: "Healthy",
-    area: "8 Acres",
-  },
-
-  {
-    id: 3,
-    name: "Sunrise Livestock Farm",
-    location: "Satara, Maharashtra",
-    type: "Livestock Farm",
-    animals: 67,
-    cows: 14,
-    buffaloes: 10,
-    goats: 25,
-    sheep: 12,
-    chickens: 6,
-    milk: "94 L/day",
-    status: "Attention",
-    area: "18 Acres",
-  },
-];
-
+import { getAnimals } from "../api/animals";
+import { getMilkRecords } from "../api/milk";
 
 export default function Farms() {
-
-  const [farms, setFarms] =
-    useState(initialFarms);
-
-  const [search, setSearch] =
-    useState("");
-
-  const [open, setOpen] =
-    useState(false);
-
-  const [selectedFarm, setSelectedFarm] =
-    useState(null);
+  const [farms, setFarms] = useState([]);
+  const [animals, setAnimals] = useState([]);
+  const [milkRecords, setMilkRecords] = useState([]);
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const [selectedFarm, setSelectedFarm] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [newFarm, setNewFarm] = useState({
-    name: "",
-    location: "",
-    type: "Mixed Livestock",
-    area: "",
+    farm_name: "",
+    village: "",
+    district: "",
+    state: "",
+    total_land: "",
   });
 
+  // =====================================================
+  // LOAD DATA
+  // =====================================================
 
-  const filteredFarms =
-    farms.filter((farm) =>
-      farm.name
-        .toLowerCase()
-        .includes(search.toLowerCase())
-    );
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
+        const [farmsData, animalsData, milkData] =
+          await Promise.all([
+            fetchFarms().catch((err) => {
+              console.error("Farms API error:", err);
+              return [];
+            }),
 
-  const totalAnimals =
-    farms.reduce(
-      (sum, farm) =>
-        sum + farm.animals,
-      0
-    );
+            getAnimals().catch((err) => {
+              console.error("Animals API error:", err);
+              return [];
+            }),
 
+            getMilkRecords().catch((err) => {
+              console.error("Milk API error:", err);
+              return [];
+            }),
+          ]);
 
-  const totalMilk =
-    farms.reduce(
-      (sum, farm) =>
-        sum +
-        parseInt(
-          farm.milk
-            .replace(" L/day", "")
-        ),
-      0
-    );
+        console.log("Farms:", farmsData);
+        console.log("Animals:", animalsData);
+        console.log("Milk:", milkData);
 
+        setFarms(
+          Array.isArray(farmsData)
+            ? farmsData
+            : farmsData?.data || farmsData?.farms || []
+        );
 
-  const healthyFarms =
-    farms.filter(
-      (farm) =>
-        farm.status === "Healthy"
-    ).length;
+        setAnimals(
+          Array.isArray(animalsData)
+            ? animalsData
+            : animalsData?.data || animalsData?.animals || []
+        );
 
+        setMilkRecords(
+          Array.isArray(milkData)
+            ? milkData
+            : milkData?.data || milkData?.records || []
+        );
+      } catch (err) {
+        console.error("Error loading farms:", err);
+        setError("Failed to load farms data.");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const attentionFarms =
-    farms.filter(
-      (farm) =>
-        farm.status === "Attention"
-    ).length;
+    loadData();
+  }, []);
 
+  // =====================================================
+  // SEARCH
+  // =====================================================
 
-  const handleAddFarm = () => {
+  const filteredFarms = farms.filter((farm) =>
+    String(farm?.farm_name || "")
+      .toLowerCase()
+      .includes(search.toLowerCase())
+  );
 
-    if (
-      !newFarm.name ||
-      !newFarm.location
-    ) {
+  // =====================================================
+  // SUMMARY
+  // =====================================================
+
+  const totalAnimals = animals.length;
+
+  const totalMilk = milkRecords.reduce(
+    (sum, record) =>
+      sum + (Number(record?.total_litres) || 0),
+    0
+  );
+
+  const healthyFarms = farms.length;
+
+  // =====================================================
+  // ADD FARM
+  // =====================================================
+
+  const handleAddFarm = async () => {
+    setError(null);
+
+    if (!newFarm.farm_name.trim()) {
+      setError("Farm name is required.");
       return;
     }
 
+    if (!newFarm.village.trim()) {
+      setError("Village is required.");
+      return;
+    }
 
-    const farm = {
-      id: Date.now(),
-      name: newFarm.name,
-      location: newFarm.location,
-      type: newFarm.type,
-      area: newFarm.area || "Not specified",
-      animals: 0,
-      cows: 0,
-      buffaloes: 0,
-      goats: 0,
-      sheep: 0,
-      chickens: 0,
-      milk: "0 L/day",
-      status: "Healthy",
-    };
+    try {
+      const farmData = {
+        farm_name: newFarm.farm_name.trim(),
+        village: newFarm.village.trim(),
+        district: newFarm.district.trim(),
+        state: newFarm.state.trim(),
+        total_land: Number(newFarm.total_land) || 0,
+      };
 
+      console.log("Creating farm:", farmData);
 
-    setFarms([
-      ...farms,
-      farm,
-    ]);
+      await createFarm(farmData);
 
+      const updatedFarms = await fetchFarms();
 
-    setNewFarm({
-      name: "",
-      location: "",
-      type: "Mixed Livestock",
-      area: "",
-    });
+      setFarms(
+        Array.isArray(updatedFarms)
+          ? updatedFarms
+          : updatedFarms?.data || updatedFarms?.farms || []
+      );
 
+      setNewFarm({
+        farm_name: "",
+        village: "",
+        district: "",
+        state: "",
+        total_land: "",
+      });
 
-    setOpen(false);
+      setOpen(false);
+    } catch (err) {
+      console.error("Error adding farm:", err);
+
+      setError(
+        err?.message ||
+          "Failed to add farm. Please try again."
+      );
+    }
   };
 
+  // =====================================================
+  // DELETE FARM
+  // =====================================================
 
-  const deleteFarm = (id) => {
+  const handleDeleteFarm = async (farmId) => {
+    if (!farmId) {
+      setError("Invalid farm ID.");
+      return;
+    }
 
-    setFarms(
-      farms.filter(
-        (farm) =>
-          farm.id !== id
-      )
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this farm?"
     );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setError(null);
+
+      await deleteAPI(farmId);
+
+      setFarms((previous) =>
+        previous.filter(
+          (farm) => farm.farm_id !== farmId
+        )
+      );
+    } catch (err) {
+      console.error("Error deleting farm:", err);
+
+      setError(
+        err?.message || "Failed to delete farm."
+      );
+    }
   };
 
+  // =====================================================
+  // LOADING
+  // =====================================================
+
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "#f5f8ff",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  // =====================================================
+  // UI
+  // =====================================================
 
   return (
     <Box
@@ -219,6 +274,20 @@ export default function Farms() {
         },
       }}
     >
+      {/* ERROR */}
+
+      {error && (
+        <Alert
+          severity="error"
+          onClose={() => setError(null)}
+          sx={{
+            mb: 3,
+            borderRadius: 3,
+          }}
+        >
+          {error}
+        </Alert>
+      )}
 
       {/* =================================================
           HEADER
@@ -227,8 +296,7 @@ export default function Farms() {
       <Box
         sx={{
           display: "flex",
-          justifyContent:
-            "space-between",
+          justifyContent: "space-between",
           alignItems: {
             xs: "flex-start",
             md: "center",
@@ -238,9 +306,7 @@ export default function Farms() {
           mb: 4,
         }}
       >
-
         <Box>
-
           <Box
             sx={{
               display: "flex",
@@ -248,13 +314,11 @@ export default function Farms() {
               gap: 1.5,
             }}
           >
-
             <Avatar
               sx={{
                 width: 52,
                 height: 52,
-                backgroundColor:
-                  "#dcfce7",
+                backgroundColor: "#dcfce7",
                 color: "#16a34a",
               }}
             >
@@ -268,47 +332,39 @@ export default function Farms() {
             >
               My Farms 🌾
             </Typography>
-
           </Box>
-
 
           <Typography
             color="text.secondary"
             sx={{ mt: 1 }}
           >
-            Manage farms, livestock,
-            production and connected
-            smart-farming devices.
+            Manage farms, livestock, production and
+            connected smart-farming devices.
           </Typography>
-
         </Box>
-
 
         <Button
           variant="contained"
           startIcon={<Add />}
-          onClick={() =>
-            setOpen(true)
-          }
+          onClick={() => {
+            setError(null);
+            setOpen(true);
+          }}
           sx={{
             borderRadius: 3,
             textTransform: "none",
             fontWeight: 900,
             px: 3,
             py: 1.3,
-            backgroundColor:
-              "#16a34a",
+            backgroundColor: "#16a34a",
             "&:hover": {
-              backgroundColor:
-                "#15803d",
+              backgroundColor: "#15803d",
             },
           }}
         >
           Add New Farm
         </Button>
-
       </Box>
-
 
       {/* =================================================
           SUMMARY
@@ -319,7 +375,6 @@ export default function Farms() {
         spacing={2.5}
         sx={{ mb: 4 }}
       >
-
         <Summary
           title="Total Farms"
           value={farms.length}
@@ -338,7 +393,7 @@ export default function Farms() {
 
         <Summary
           title="Milk Production"
-          value={`${totalMilk} L`}
+          value={`${totalMilk.toFixed(1)} L`}
           icon={<LocalDrink />}
           color="#0891b2"
           background="#cffafe"
@@ -351,9 +406,7 @@ export default function Farms() {
           color="#7c3aed"
           background="#ede9fe"
         />
-
       </Grid>
-
 
       {/* =================================================
           SEARCH
@@ -364,35 +417,29 @@ export default function Farms() {
           mb: 3,
           borderRadius: 4,
           boxShadow: "none",
-          border:
-            "1px solid #e5e7eb",
+          border: "1px solid #e5e7eb",
         }}
       >
-
         <CardContent>
-
           <TextField
             fullWidth
             placeholder="Search farms by name..."
             value={search}
-            onChange={(e) =>
-              setSearch(
-                e.target.value
-              )
+            onChange={(event) =>
+              setSearch(event.target.value)
             }
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search />
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search />
+                  </InputAdornment>
+                ),
+              },
             }}
           />
-
         </CardContent>
-
       </Card>
-
 
       {/* =================================================
           FARM CARDS
@@ -402,55 +449,41 @@ export default function Farms() {
         container
         spacing={3}
       >
-
-        {filteredFarms.map(
-          (farm) => (
-
-            <Grid
-              item
-              xs={12}
-              md={6}
-              lg={4}
-              key={farm.id}
-            >
-
-              <FarmCard
-                farm={farm}
-                onView={() =>
-                  setSelectedFarm(
-                    farm
-                  )
-                }
-                onDelete={() =>
-                  deleteFarm(
-                    farm.id
-                  )
-                }
-              />
-
-            </Grid>
-
-          )
-        )}
-
+        {filteredFarms.map((farm) => (
+          <Grid
+            key={farm.farm_id}
+            size={{
+              xs: 12,
+              md: 6,
+              lg: 4,
+            }}
+          >
+            <FarmCard
+              farm={farm}
+              onView={() => setSelectedFarm(farm)}
+              onDelete={() =>
+                handleDeleteFarm(farm.farm_id)
+              }
+            />
+          </Grid>
+        ))}
       </Grid>
-
 
       {/* =================================================
           EMPTY STATE
       ================================================== */}
 
       {filteredFarms.length === 0 && (
-
         <Card
           sx={{
             mt: 3,
             borderRadius: 4,
             textAlign: "center",
             p: 5,
+            boxShadow: "none",
+            border: "1px solid #e5e7eb",
           }}
         >
-
           <Agriculture
             sx={{
               fontSize: 55,
@@ -465,17 +498,11 @@ export default function Farms() {
             No farms found
           </Typography>
 
-          <Typography
-            color="text.secondary"
-          >
-            Try another search or add a
-            new farm.
+          <Typography color="text.secondary">
+            Try another search or add a new farm.
           </Typography>
-
         </Card>
-
       )}
-
 
       {/* =================================================
           FARM DETAIL DIALOG
@@ -483,37 +510,29 @@ export default function Farms() {
 
       <Dialog
         open={Boolean(selectedFarm)}
-        onClose={() =>
-          setSelectedFarm(null)
-        }
+        onClose={() => setSelectedFarm(null)}
         fullWidth
         maxWidth="sm"
       >
-
         {selectedFarm && (
-
           <>
             <DialogTitle
               sx={{
                 fontWeight: 900,
               }}
             >
-              {selectedFarm.name}
+              {selectedFarm.farm_name}
             </DialogTitle>
 
-
             <DialogContent>
-
               <Box
                 sx={{
                   display: "flex",
-                  alignItems:
-                    "center",
+                  alignItems: "center",
                   gap: 1,
                   mb: 3,
                 }}
               >
-
                 <LocationOn
                   sx={{
                     color: "#dc2626",
@@ -521,87 +540,42 @@ export default function Farms() {
                 />
 
                 <Typography>
-                  {selectedFarm.location}
+                  {selectedFarm.village || "—"}
+                  {selectedFarm.district
+                    ? `, ${selectedFarm.district}`
+                    : ""}
+                  {selectedFarm.state
+                    ? `, ${selectedFarm.state}`
+                    : ""}
                 </Typography>
-
               </Box>
-
 
               <Grid
                 container
                 spacing={2}
               >
-
                 <Detail
-                  label="Farm Type"
-                  value={
-                    selectedFarm.type
-                  }
+                  label="Farm Area"
+                  value={`${selectedFarm.total_land || 0} acres`}
                 />
 
                 <Detail
-                  label="Area"
-                  value={
-                    selectedFarm.area
-                  }
+                  label="Village"
+                  value={selectedFarm.village || "—"}
                 />
 
                 <Detail
-                  label="Total Animals"
-                  value={
-                    selectedFarm.animals
-                  }
+                  label="District"
+                  value={selectedFarm.district || "—"}
                 />
 
                 <Detail
-                  label="Milk Production"
-                  value={
-                    selectedFarm.milk
-                  }
+                  label="State"
+                  value={selectedFarm.state || "—"}
                 />
-
-                <Detail
-                  label="Cows"
-                  value={
-                    selectedFarm.cows
-                  }
-                />
-
-                <Detail
-                  label="Buffaloes"
-                  value={
-                    selectedFarm.buffaloes
-                  }
-                />
-
-                <Detail
-                  label="Goats"
-                  value={
-                    selectedFarm.goats
-                  }
-                />
-
-                <Detail
-                  label="Sheep"
-                  value={
-                    selectedFarm.sheep
-                  }
-                />
-
-                <Detail
-                  label="Chickens"
-                  value={
-                    selectedFarm.chickens
-                  }
-                />
-
               </Grid>
 
-
-              <Divider
-                sx={{ my: 3 }}
-              />
-
+              <Divider sx={{ my: 3 }} />
 
               <Box
                 sx={{
@@ -610,42 +584,24 @@ export default function Farms() {
                   flexWrap: "wrap",
                 }}
               >
-
                 <Chip
                   icon={<Sensors />}
-                  label="IoT Connected"
+                  label="Farm Active"
                   color="success"
                 />
-
-                <Chip
-                  icon={<Pets />}
-                  label="AI Monitoring Active"
-                  color="primary"
-                />
-
               </Box>
-
             </DialogContent>
 
-
             <DialogActions>
-
               <Button
-                onClick={() =>
-                  setSelectedFarm(null)
-                }
+                onClick={() => setSelectedFarm(null)}
               >
                 Close
               </Button>
-
             </DialogActions>
-
           </>
-
         )}
-
       </Dialog>
-
 
       {/* =================================================
           ADD FARM DIALOG
@@ -653,13 +609,10 @@ export default function Farms() {
 
       <Dialog
         open={open}
-        onClose={() =>
-          setOpen(false)
-        }
+        onClose={() => setOpen(false)}
         fullWidth
         maxWidth="sm"
       >
-
         <DialogTitle
           sx={{
             fontWeight: 900,
@@ -668,110 +621,93 @@ export default function Farms() {
           Add New Farm 🌾
         </DialogTitle>
 
-
         <DialogContent>
-
           <TextField
             fullWidth
             label="Farm Name"
             margin="normal"
-            value={newFarm.name}
-            onChange={(e) =>
-              setNewFarm({
-                ...newFarm,
-                name: e.target.value,
-              })
+            required
+            value={newFarm.farm_name}
+            onChange={(event) =>
+              setNewFarm((previous) => ({
+                ...previous,
+                farm_name: event.target.value,
+              }))
             }
           />
 
-
           <TextField
             fullWidth
-            label="Location"
+            label="Village"
             margin="normal"
-            value={newFarm.location}
-            onChange={(e) =>
-              setNewFarm({
-                ...newFarm,
-                location: e.target.value,
-              })
+            required
+            value={newFarm.village}
+            onChange={(event) =>
+              setNewFarm((previous) => ({
+                ...previous,
+                village: event.target.value,
+              }))
             }
           />
 
-
-          <TextField
-            select
-            fullWidth
-            label="Farm Type"
-            margin="normal"
-            value={newFarm.type}
-            onChange={(e) =>
-              setNewFarm({
-                ...newFarm,
-                type: e.target.value,
-              })
-            }
-          >
-
-            <MenuItem value="Mixed Livestock">
-              Mixed Livestock
-            </MenuItem>
-
-            <MenuItem value="Dairy Farm">
-              Dairy Farm
-            </MenuItem>
-
-            <MenuItem value="Goat Farm">
-              Goat Farm
-            </MenuItem>
-
-            <MenuItem value="Sheep Farm">
-              Sheep Farm
-            </MenuItem>
-
-            <MenuItem value="Poultry Farm">
-              Poultry Farm
-            </MenuItem>
-
-          </TextField>
-
-
           <TextField
             fullWidth
-            label="Farm Area"
-            placeholder="Example: 10 Acres"
+            label="District"
             margin="normal"
-            value={newFarm.area}
-            onChange={(e) =>
-              setNewFarm({
-                ...newFarm,
-                area: e.target.value,
-              })
+            value={newFarm.district}
+            onChange={(event) =>
+              setNewFarm((previous) => ({
+                ...previous,
+                district: event.target.value,
+              }))
             }
           />
 
+          <TextField
+            fullWidth
+            label="State"
+            margin="normal"
+            value={newFarm.state}
+            onChange={(event) =>
+              setNewFarm((previous) => ({
+                ...previous,
+                state: event.target.value,
+              }))
+            }
+          />
+
+          <TextField
+            fullWidth
+            label="Total Land (acres)"
+            type="number"
+            margin="normal"
+            value={newFarm.total_land}
+            onChange={(event) =>
+              setNewFarm((previous) => ({
+                ...previous,
+                total_land: event.target.value,
+              }))
+            }
+            slotProps={{
+              htmlInput: {
+                min: 0,
+                step: 0.1,
+              },
+            }}
+          />
         </DialogContent>
 
-
-        <DialogActions
-          sx={{ p: 2 }}
-        >
-
+        <DialogActions sx={{ p: 2 }}>
           <Button
-            onClick={() =>
-              setOpen(false)
-            }
+            onClick={() => setOpen(false)}
           >
             Cancel
           </Button>
 
-
           <Button
             variant="contained"
             startIcon={<Add />}
-            onClick={
-              handleAddFarm
-            }
+            onClick={handleAddFarm}
             sx={{
               borderRadius: 2.5,
               fontWeight: 800,
@@ -779,15 +715,11 @@ export default function Farms() {
           >
             Add Farm
           </Button>
-
         </DialogActions>
-
       </Dialog>
-
     </Box>
   );
 }
-
 
 /* =====================================================
    SUMMARY
@@ -800,37 +732,32 @@ function Summary({
   color,
   background,
 }) {
-
   return (
     <Grid
-      item
-      xs={12}
-      sm={6}
-      md={3}
+      size={{
+        xs: 12,
+        sm: 6,
+        md: 3,
+      }}
     >
-
       <Card
         sx={{
+          height: "100%",
           borderRadius: 4,
           boxShadow: "none",
-          border:
-            "1px solid #e5e7eb",
+          border: "1px solid #e5e7eb",
         }}
       >
-
         <CardContent>
-
           <Avatar
             sx={{
-              backgroundColor:
-                background,
+              backgroundColor: background,
               color,
               mb: 2,
             }}
           >
             {icon}
           </Avatar>
-
 
           <Typography
             variant="body2"
@@ -839,7 +766,6 @@ function Summary({
             {title}
           </Typography>
 
-
           <Typography
             variant="h5"
             fontWeight={900}
@@ -847,15 +773,11 @@ function Summary({
           >
             {value}
           </Typography>
-
         </CardContent>
-
       </Card>
-
     </Grid>
   );
 }
-
 
 /* =====================================================
    FARM CARD
@@ -866,24 +788,27 @@ function FarmCard({
   onView,
   onDelete,
 }) {
+  const farmName =
+    farm?.farm_name || "Unknown Farm";
 
-  const statusColor =
-    farm.status === "Healthy"
-      ? "success"
-      : "warning";
-
+  const location = [
+    farm?.village,
+    farm?.district,
+    farm?.state,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
     <Card
       sx={{
+        height: "100%",
         borderRadius: 4,
         boxShadow: "none",
-        border:
-          "1px solid #e5e7eb",
+        border: "1px solid #e5e7eb",
         overflow: "hidden",
       }}
     >
-
       {/* COLOR HEADER */}
 
       <Box
@@ -894,61 +819,53 @@ function FarmCard({
         }}
       />
 
-
       <CardContent sx={{ p: 3 }}>
-
         {/* FARM HEADER */}
 
         <Box
           sx={{
             display: "flex",
-            justifyContent:
-              "space-between",
+            justifyContent: "space-between",
             alignItems: "flex-start",
             gap: 2,
           }}
         >
-
           <Box
             sx={{
               display: "flex",
               gap: 1.5,
+              minWidth: 0,
             }}
           >
-
             <Avatar
               sx={{
                 width: 54,
                 height: 54,
-                backgroundColor:
-                  "#dcfce7",
+                flexShrink: 0,
+                backgroundColor: "#dcfce7",
                 color: "#16a34a",
               }}
             >
               <Agriculture />
             </Avatar>
 
-
-            <Box>
-
+            <Box sx={{ minWidth: 0 }}>
               <Typography
                 variant="h6"
                 fontWeight={900}
+                noWrap
               >
-                {farm.name}
+                {farmName}
               </Typography>
-
 
               <Box
                 sx={{
                   display: "flex",
-                  alignItems:
-                    "center",
+                  alignItems: "center",
                   gap: 0.5,
                   mt: 0.5,
                 }}
               >
-
                 <LocationOn
                   sx={{
                     fontSize: 17,
@@ -959,92 +876,36 @@ function FarmCard({
                 <Typography
                   variant="body2"
                   color="text.secondary"
+                  noWrap
                 >
-                  {farm.location}
+                  {location || "Location not provided"}
                 </Typography>
-
               </Box>
-
             </Box>
-
           </Box>
-
 
           <Chip
             size="small"
-            label={farm.status}
-            color={statusColor}
+            label="Active"
+            color="success"
             sx={{
               fontWeight: 800,
+              flexShrink: 0,
             }}
           />
-
         </Box>
 
-
         <Chip
-          label={farm.type}
+          label="Mixed Livestock"
           size="small"
           sx={{
             mt: 2,
-            backgroundColor:
-              "#f1f5f9",
+            backgroundColor: "#f1f5f9",
             fontWeight: 700,
           }}
         />
 
-
-        <Divider
-          sx={{ my: 2 }}
-        />
-
-
-        {/* ANIMAL COUNTS */}
-
-        <Typography
-          variant="body2"
-          fontWeight={800}
-          sx={{ mb: 1.5 }}
-        >
-          Livestock
-        </Typography>
-
-
-        <Box
-          sx={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 1,
-          }}
-        >
-
-          <AnimalChip
-            emoji="🐄"
-            label={farm.cows}
-          />
-
-          <AnimalChip
-            emoji="🐃"
-            label={farm.buffaloes}
-          />
-
-          <AnimalChip
-            emoji="🐐"
-            label={farm.goats}
-          />
-
-          <AnimalChip
-            emoji="🐑"
-            label={farm.sheep}
-          />
-
-          <AnimalChip
-            emoji="🐔"
-            label={farm.chickens}
-          />
-
-        </Box>
-
+        <Divider sx={{ my: 2 }} />
 
         {/* FARM STATS */}
 
@@ -1053,27 +914,12 @@ function FarmCard({
           spacing={1.5}
           sx={{ mt: 1 }}
         >
-
-          <Stat
-            icon={<Pets />}
-            label="Animals"
-            value={farm.animals}
-          />
-
-          <Stat
-            icon={<LocalDrink />}
-            label="Milk"
-            value={farm.milk}
-          />
-
           <Stat
             icon={<Grass />}
             label="Area"
-            value={farm.area}
+            value={`${farm?.total_land || 0} acres`}
           />
-
         </Grid>
-
 
         {/* ACTIONS */}
 
@@ -1084,7 +930,6 @@ function FarmCard({
             mt: 2.5,
           }}
         >
-
           <Button
             fullWidth
             variant="contained"
@@ -1094,13 +939,14 @@ function FarmCard({
               borderRadius: 2.5,
               textTransform: "none",
               fontWeight: 800,
-              backgroundColor:
-                "#2563eb",
+              backgroundColor: "#2563eb",
+              "&:hover": {
+                backgroundColor: "#1d4ed8",
+              },
             }}
           >
             View Farm
           </Button>
-
 
           <Button
             variant="outlined"
@@ -1113,39 +959,11 @@ function FarmCard({
           >
             <Delete />
           </Button>
-
         </Box>
-
       </CardContent>
-
     </Card>
   );
 }
-
-
-/* =====================================================
-   ANIMAL CHIP
-===================================================== */
-
-function AnimalChip({
-  emoji,
-  label,
-}) {
-
-  return (
-    <Chip
-      label={`${emoji} ${label}`}
-      sx={{
-        backgroundColor:
-          "#f8fafc",
-        border:
-          "1px solid #e2e8f0",
-        fontWeight: 800,
-      }}
-    />
-  );
-}
-
 
 /* =====================================================
    STAT
@@ -1156,43 +974,34 @@ function Stat({
   label,
   value,
 }) {
-
   return (
     <Grid
-      item
-      xs={12}
-      sm={4}
+      size={{
+        xs: 12,
+        sm: 4,
+      }}
     >
-
       <Box
         sx={{
           p: 1.5,
           borderRadius: 2.5,
-          backgroundColor:
-            "#f8fafc",
+          backgroundColor: "#f8fafc",
         }}
       >
-
         <Box
           sx={{
             display: "flex",
-            alignItems:
-              "center",
+            alignItems: "center",
             gap: 0.7,
             color: "#64748b",
           }}
         >
-
           {icon}
 
-          <Typography
-            variant="caption"
-          >
+          <Typography variant="caption">
             {label}
           </Typography>
-
         </Box>
-
 
         <Typography
           fontWeight={900}
@@ -1200,13 +1009,10 @@ function Stat({
         >
           {value}
         </Typography>
-
       </Box>
-
     </Grid>
   );
 }
-
 
 /* =====================================================
    DETAIL
@@ -1216,22 +1022,19 @@ function Detail({
   label,
   value,
 }) {
-
   return (
     <Grid
-      item
-      xs={6}
+      size={{
+        xs: 6,
+      }}
     >
-
       <Box
         sx={{
           p: 1.5,
           borderRadius: 2.5,
-          backgroundColor:
-            "#f8fafc",
+          backgroundColor: "#f8fafc",
         }}
       >
-
         <Typography
           variant="caption"
           color="text.secondary"
@@ -1245,9 +1048,7 @@ function Detail({
         >
           {value}
         </Typography>
-
       </Box>
-
     </Grid>
   );
 }

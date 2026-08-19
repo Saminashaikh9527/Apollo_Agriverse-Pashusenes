@@ -82,3 +82,9 @@ class Animal(Base):
         back_populates="animal",
         cascade="all, delete-orphan",
     )
+
+    growth_records = relationship(
+       "GrowthRecord",
+        back_populates="animal",
+        cascade="all, delete-orphan",
+   )

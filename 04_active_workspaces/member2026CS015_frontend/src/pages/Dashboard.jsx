@@ -1,58 +1,287 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   Box,
-  Typography,
   Card,
   CardContent,
-  Grid,
-  Chip,
-  Button,
+  Typography,
   Avatar,
-  LinearProgress,
+  Chip,
+  CircularProgress,
+  Alert,
+  Button,
   Divider,
 } from "@mui/material";
 
 import {
-  Dashboard as DashboardIcon,
   Pets,
   LocalDrink,
   Egg,
-  Agriculture,
-  Warning,
-  CheckCircle,
+  Grass,
+  Texture,
   TrendingUp,
-  WaterDrop,
-  Restaurant,
-  Thermostat,
-  Visibility,
+  WarningAmber,
+  CheckCircle,
   ArrowForward,
-  NotificationsActive,
-  Psychology,
-  Wifi,
+  Refresh,
+  Home,
+  ArrowBack,
 } from "@mui/icons-material";
 
+import { useNavigate } from "react-router-dom";
+
+import { getAnimals } from "../api/animals";
+import { getFarms } from "../api/farms";
+import { getMilkRecords } from "../api/milk";
+import { getFeedRecords } from "../api/feed";
+import { getEggRecords } from "../api/egg";
+import { getWoolRecords } from "../api/wool";
+import { getHealthRecords } from "../api/health";
+import { getGrowthRecords } from "../api/growth";
+import { getVaccinationRecords } from "../api/vaccination";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
 
-  const [selectedFarm] = useState(
-    "Green Valley Farm"
-  );
+  const [animals, setAnimals] = useState([]);
+  const [moduleCounts, setModuleCounts] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
+  /* =========================================================
+     LOAD ANIMALS
+  ========================================================= */
+
+  const loadAnimals = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const requests = [
+        getAnimals(),
+        getFarms(),
+        getMilkRecords(),
+        getFeedRecords(),
+        getEggRecords(),
+        getWoolRecords(),
+        getHealthRecords(),
+        getGrowthRecords(),
+        getVaccinationRecords(),
+      ];
+
+      const results = await Promise.allSettled(requests);
+
+      const [animalResult, ...otherResults] = results;
+
+      if (animalResult.status !== "fulfilled") {
+        throw animalResult.reason;
+      }
+
+      setAnimals(
+        Array.isArray(animalResult.value)
+          ? animalResult.value
+          : []
+      );
+
+      const names = [
+        "farms",
+        "milk",
+        "feed",
+        "eggs",
+        "wool",
+        "health",
+        "growth",
+        "vaccination",
+      ];
+
+      setModuleCounts(
+        Object.fromEntries(
+          otherResults.map(
+            (result, index) => [
+              names[index],
+              result.status === "fulfilled" &&
+              Array.isArray(result.value)
+                ? result.value.length
+                : null,
+            ]
+          )
+        )
+      );
+    } catch (err) {
+      console.error(
+        "Dashboard animals error:",
+        err
+      );
+
+      setError(
+        err?.message ||
+          "Failed to load animals."
+      );
+
+      setAnimals([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAnimals();
+  }, []);
+
+  /* =========================================================
+     STATISTICS
+  ========================================================= */
+
+  const statistics = useMemo(() => {
+    const total = animals.length;
+
+    const getSpeciesCount = (speciesName) => {
+      return animals.filter((animal) =>
+        String(animal?.species || "")
+          .trim()
+          .toLowerCase()
+          .includes(speciesName)
+      ).length;
+    };
+
+    return {
+      total,
+      cows: getSpeciesCount("cow"),
+      buffaloes: getSpeciesCount("buffalo"),
+      goats: getSpeciesCount("goat"),
+      sheep: getSpeciesCount("sheep"),
+      chickens: getSpeciesCount("chicken"),
+      farms: moduleCounts.farms,
+      milk: moduleCounts.milk,
+      feed: moduleCounts.feed,
+      eggs: moduleCounts.eggs,
+      wool: moduleCounts.wool,
+      health: moduleCounts.health,
+      growth: moduleCounts.growth,
+      vaccination: moduleCounts.vaccination,
+    };
+  }, [animals, moduleCounts]);
+
+  /* =========================================================
+     ANIMAL HELPERS
+  ========================================================= */
+
+  const getAnimalId = (animal) =>
+    animal?.animal_id ??
+    animal?.id ??
+    animal?.animalId ??
+    "-";
+
+  const getAnimalName = (animal) =>
+    animal?.tag_number ||
+    animal?.tagNumber ||
+    `Animal ${getAnimalId(animal)}`;
+
+  const getSpecies = (animal) =>
+    animal?.species || "Unknown";
+
+  const getStatus = (animal) =>
+    animal?.status || "Active";
+
+  /* =========================================================
+     STATUS COLOR
+  ========================================================= */
+
+  const getStatusColor = (status) => {
+    const value = String(status).toLowerCase();
+
+    if (
+      value.includes("healthy") ||
+      value.includes("active") ||
+      value.includes("normal")
+    ) {
+      return "success";
+    }
+
+    if (
+      value.includes("warning") ||
+      value.includes("attention")
+    ) {
+      return "warning";
+    }
+
+    if (
+      value.includes("sick") ||
+      value.includes("critical") ||
+      value.includes("inactive")
+    ) {
+      return "error";
+    }
+
+    return "default";
+  };
+
+  /* =========================================================
+     STAT CARDS
+  ========================================================= */
+
+  const statCards = [
+    {
+      title: "Total Animals",
+      value: statistics.total,
+      icon: <Pets />,
+      background: "#ede9fe",
+      color: "#7c3aed",
+    },
+    {
+      title: "Cows",
+      value: statistics.cows,
+      icon: <Pets />,
+      background: "#dcfce7",
+      color: "#16a34a",
+    },
+    {
+      title: "Buffaloes",
+      value: statistics.buffaloes,
+      icon: <Pets />,
+      background: "#dbeafe",
+      color: "#2563eb",
+    },
+    {
+      title: "Goats",
+      value: statistics.goats,
+      icon: <Pets />,
+      background: "#ffedd5",
+      color: "#ea580c",
+    },
+    {
+      title: "Sheep",
+      value: statistics.sheep,
+      icon: <Pets />,
+      background: "#fce7f3",
+      color: "#db2777",
+    },
+    {
+      title: "Chickens",
+      value: statistics.chickens,
+      icon: <Egg />,
+      background: "#fef9c3",
+      color: "#ca8a04",
+    },
+  ];
+
+  /* =========================================================
+     UI
+  ========================================================= */
 
   return (
     <Box
       sx={{
-        minHeight: "100vh",
-        backgroundColor: "#f4f7fb",
         p: {
           xs: 2,
           sm: 3,
           md: 4,
         },
+        maxWidth: 1600,
+        mx: "auto",
+        width: "100%",
       }}
     >
-
       {/* =====================================================
           HEADER
       ====================================================== */}
@@ -63,1219 +292,740 @@ export default function Dashboard() {
           justifyContent: "space-between",
           alignItems: {
             xs: "flex-start",
-            md: "center",
+            sm: "center",
           },
           flexDirection: {
             xs: "column",
-            md: "row",
+            sm: "row",
           },
           gap: 2,
-          mb: 3,
+          mb: 4,
         }}
       >
-
         <Box>
-
-          <Box
+          <Typography
+            variant="h4"
             sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1.5,
+              fontWeight: 900,
+              color: "#064e3b",
+              mb: 0.5,
             }}
           >
+            Dashboard
+          </Typography>
 
-            <Avatar
-              sx={{
-                width: 54,
-                height: 54,
-                backgroundColor: "#dcfce7",
-                color: "#16a34a",
-              }}
-            >
-              <DashboardIcon
-                sx={{
-                  fontSize: 30,
-                }}
-              />
-            </Avatar>
-
-            <Box>
-
-              <Typography
-                variant="h4"
-                fontWeight={900}
-                color="#111827"
-              >
-                Dashboard 🌾
-              </Typography>
-
-              <Typography
-                color="text.secondary"
-                sx={{
-                  mt: 0.5,
-                }}
-              >
-                Welcome back, Admin. Here's what's
-                happening on your farm today.
-              </Typography>
-
-            </Box>
-
-          </Box>
-
+          <Typography
+            variant="body1"
+            sx={{
+              color: "#64748b",
+            }}
+          >
+            Welcome to Apollo Agriverse PashuSense —
+            Precision Livestock Farming.
+          </Typography>
         </Box>
-
-
-        {/* CURRENT FARM */}
 
         <Box
           sx={{
-            minWidth: {
-              xs: "100%",
-              md: 250,
-            },
-            backgroundColor: "#ffffff",
-            borderRadius: 3,
-            border: "1px solid #e5e7eb",
-            p: 1.5,
+            display: "flex",
+            gap: 1.5,
+            flexWrap: "wrap",
           }}
         >
+          {/* BACK TO HOME */}
 
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            fontWeight={700}
-          >
-            CURRENT FARM
-          </Typography>
-
-          <Box
+          <Button
+            variant="contained"
+            startIcon={<ArrowBack />}
+            onClick={() => navigate("/")}
             sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              mt: 0.5,
+              borderRadius: 2.5,
+              textTransform: "none",
+              fontWeight: 800,
+              backgroundColor: "#047857",
+
+              "&:hover": {
+                backgroundColor: "#065f46",
+              },
             }}
           >
+            Back to Home
+          </Button>
 
-            <Typography
-              fontWeight={900}
-            >
-              {selectedFarm}
-            </Typography>
+          {/* REFRESH */}
 
-            <Chip
-              label="LIVE"
-              size="small"
-              sx={{
-                backgroundColor: "#dcfce7",
-                color: "#15803d",
-                fontWeight: 900,
-              }}
-            />
-
-          </Box>
-
+          <Button
+            variant="outlined"
+            startIcon={<Refresh />}
+            onClick={loadAnimals}
+            disabled={loading}
+            sx={{
+              borderRadius: 2.5,
+              textTransform: "none",
+              fontWeight: 700,
+            }}
+          >
+            Refresh
+          </Button>
         </Box>
-
       </Box>
 
-
       {/* =====================================================
-          QUICK STATUS
+          ERROR
       ====================================================== */}
 
-      <Grid
-        container
-        spacing={2}
-        sx={{
-          mb: 3,
-        }}
-      >
-
-        <StatCard
-          title="Total Animals"
-          value="147"
-          subtitle="+8 this month"
-          icon={<Pets />}
-          background="#eff6ff"
-          iconBackground="#dbeafe"
-          iconColor="#2563eb"
-          trend
-        />
-
-        <StatCard
-          title="Milk Production"
-          value="402 L"
-          subtitle="Today's production"
-          icon={<LocalDrink />}
-          background="#ecfeff"
-          iconBackground="#cffafe"
-          iconColor="#0891b2"
-          trend
-        />
-
-        <StatCard
-          title="Healthy Animals"
-          value="138"
-          subtitle="93.9% healthy"
-          icon={<CheckCircle />}
-          background="#f0fdf4"
-          iconBackground="#dcfce7"
-          iconColor="#16a34a"
-          trend
-        />
-
-        <StatCard
-          title="Alerts"
-          value="5"
-          subtitle="Needs attention"
-          icon={<Warning />}
-          background="#fff7ed"
-          iconBackground="#ffedd5"
-          iconColor="#ea580c"
-          alert
-        />
-
-      </Grid>
-
-
-      {/* =====================================================
-          AI + FARM HEALTH
-      ====================================================== */}
-
-      <Grid
-        container
-        spacing={3}
-        sx={{
-          mb: 3,
-        }}
-      >
-
-        {/* FARM HEALTH */}
-
-        <Grid
-          item
-          xs={12}
-          md={7}
+      {error && (
+        <Alert
+          severity="error"
+          sx={{
+            mb: 3,
+            borderRadius: 3,
+          }}
         >
+          {error}
+        </Alert>
+      )}
 
+      {/* =====================================================
+          STATISTICS
+      ====================================================== */}
+
+      <Box
+        sx={{
+          display: "grid",
+
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, 1fr)",
+            md: "repeat(3, 1fr)",
+            lg: "repeat(6, 1fr)",
+          },
+
+          gap: 2.5,
+          mb: 4,
+        }}
+      >
+        {statCards.map((stat) => (
           <Card
+            key={stat.title}
+            elevation={0}
             sx={{
-              height: "100%",
               borderRadius: 4,
-              boxShadow: "none",
-              border: "1px solid #e5e7eb",
+              border: "1px solid #e2e8f0",
+              backgroundColor: "#ffffff",
+
+              transition:
+                "all 0.2s ease",
+
+              "&:hover": {
+                transform:
+                  "translateY(-3px)",
+
+                boxShadow:
+                  "0 12px 30px rgba(0,0,0,0.08)",
+              },
             }}
           >
-
-            <CardContent
-              sx={{
-                p: 3,
-              }}
-            >
-
+            <CardContent>
               <Box
                 sx={{
                   display: "flex",
-                  justifyContent: "space-between",
+                  justifyContent:
+                    "space-between",
                   alignItems: "center",
-                  mb: 3,
+                  gap: 1,
                 }}
               >
-
-                <Box>
-
-                  <Typography
-                    variant="h6"
-                    fontWeight={900}
-                  >
-                    Farm Health Overview
-                  </Typography>
-
+                <Box
+                  sx={{
+                    minWidth: 0,
+                  }}
+                >
                   <Typography
                     variant="body2"
-                    color="text.secondary"
+                    sx={{
+                      color: "#64748b",
+                      fontWeight: 600,
+                      mb: 1,
+                    }}
                   >
-                    Overall condition of your livestock
+                    {stat.title}
                   </Typography>
 
+                  <Typography
+                    variant="h4"
+                    sx={{
+                      fontWeight: 900,
+                      color: "#0f172a",
+                    }}
+                  >
+                    {loading ? (
+                      <CircularProgress
+                        size={28}
+                      />
+                    ) : (
+                      stat.value
+                    )}
+                  </Typography>
                 </Box>
-
-                <Chip
-                  icon={<CheckCircle />}
-                  label="Healthy"
-                  sx={{
-                    backgroundColor: "#dcfce7",
-                    color: "#15803d",
-                    fontWeight: 800,
-                  }}
-                />
-
-              </Box>
-
-
-              {/* HEALTH PROGRESS */}
-
-              <HealthBar
-                label="Overall Animal Health"
-                value={94}
-                color="#16a34a"
-              />
-
-              <HealthBar
-                label="Nutrition Status"
-                value={88}
-                color="#2563eb"
-              />
-
-              <HealthBar
-                label="Vaccination Coverage"
-                value={91}
-                color="#7c3aed"
-              />
-
-              <HealthBar
-                label="Environmental Comfort"
-                value={86}
-                color="#0891b2"
-              />
-
-            </CardContent>
-
-          </Card>
-
-        </Grid>
-
-
-        {/* AI MONITORING */}
-
-        <Grid
-          item
-          xs={12}
-          md={5}
-        >
-
-          <Card
-            sx={{
-              height: "100%",
-              borderRadius: 4,
-              boxShadow: "none",
-              border: "1px solid #e5e7eb",
-              background:
-                "linear-gradient(135deg, #f5f3ff, #ffffff)",
-            }}
-          >
-
-            <CardContent
-              sx={{
-                p: 3,
-              }}
-            >
-
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 2,
-                  mb: 3,
-                }}
-              >
 
                 <Avatar
                   sx={{
-                    backgroundColor: "#ede9fe",
-                    color: "#7c3aed",
+                    width: 48,
+                    height: 48,
+                    flexShrink: 0,
+                    backgroundColor:
+                      stat.background,
+                    color: stat.color,
                   }}
                 >
-                  <Psychology />
+                  {stat.icon}
                 </Avatar>
-
-                <Box>
-
-                  <Typography
-                    variant="h6"
-                    fontWeight={900}
-                  >
-                    AI Monitoring
-                  </Typography>
-
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
-                    Live intelligence system
-                  </Typography>
-
-                </Box>
-
               </Box>
+            </CardContent>
+          </Card>
+        ))}
+      </Box>
 
+      {/* =====================================================
+          QUICK OVERVIEW
+      ====================================================== */}
 
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: 3,
-                  backgroundColor: "#ffffff",
-                  mb: 2,
-                }}
-              >
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            lg: "2fr 1fr",
+          },
+          gap: 3,
+          mb: 4,
+        }}
+      >
+        {/* ===================================================
+            LIVESTOCK OVERVIEW
+        =================================================== */}
 
-                <Box
+        <Card
+          elevation={0}
+          sx={{
+            borderRadius: 4,
+            border:
+              "1px solid #e2e8f0",
+          }}
+        >
+          <CardContent sx={{ p: 3 }}>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent:
+                  "space-between",
+                alignItems: "center",
+                mb: 2,
+              }}
+            >
+              <Box>
+                <Typography
+                  variant="h6"
                   sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
+                    fontWeight: 800,
+                    color: "#0f172a",
                   }}
                 >
-
-                  <Typography
-                    fontWeight={700}
-                  >
-                    AI System
-                  </Typography>
-
-                  <Chip
-                    label="ONLINE"
-                    size="small"
-                    sx={{
-                      backgroundColor: "#dcfce7",
-                      color: "#15803d",
-                      fontWeight: 900,
-                    }}
-                  />
-
-                </Box>
+                  Livestock Overview
+                </Typography>
 
                 <Typography
                   variant="body2"
-                  color="text.secondary"
                   sx={{
-                    mt: 1,
+                    color: "#64748b",
+                    mt: 0.5,
                   }}
                 >
-                  Monitoring 147 animals
+                  Current animals
+                  registered in your farm.
                 </Typography>
-
               </Box>
 
-
-              <Box
+              <Pets
                 sx={{
-                  display: "flex",
-                  gap: 1.5,
+                  color: "#16a34a",
+                  fontSize: 32,
                 }}
-              >
-
-                <MiniAI
-                  icon={<Visibility />}
-                  value="98%"
-                  label="Detection"
-                />
-
-                <MiniAI
-                  icon={<Wifi />}
-                  value="24"
-                  label="Devices"
-                />
-
-              </Box>
-
-            </CardContent>
-
-          </Card>
-
-        </Grid>
-
-      </Grid>
-
-
-      {/* =====================================================
-          PRODUCTION + ALERTS
-      ====================================================== */}
-
-      <Grid
-        container
-        spacing={3}
-        sx={{
-          mb: 3,
-        }}
-      >
-
-        {/* PRODUCTION */}
-
-        <Grid
-          item
-          xs={12}
-          md={8}
-        >
-
-          <Card
-            sx={{
-              borderRadius: 4,
-              boxShadow: "none",
-              border: "1px solid #e5e7eb",
-            }}
-          >
-
-            <CardContent
-              sx={{
-                p: 3,
-              }}
-            >
-
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 3,
-                }}
-              >
-
-                <Box>
-
-                  <Typography
-                    variant="h6"
-                    fontWeight={900}
-                  >
-                    Today's Production
-                  </Typography>
-
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                  >
-                    Livestock production summary
-                  </Typography>
-
-                </Box>
-
-                <TrendingUp
-                  sx={{
-                    color: "#16a34a",
-                    fontSize: 30,
-                  }}
-                />
-
-              </Box>
-
-
-              <Grid
-                container
-                spacing={2}
-              >
-
-                <ProductionCard
-                  icon="🥛"
-                  title="Milk"
-                  value="402 L"
-                  subtitle="+6.2% vs yesterday"
-                  background="#eff6ff"
-                  color="#2563eb"
-                />
-
-                <ProductionCard
-                  icon="🥚"
-                  title="Eggs"
-                  value="1,248"
-                  subtitle="+4.8% vs yesterday"
-                  background="#fff7ed"
-                  color="#ea580c"
-                />
-
-                <ProductionCard
-                  icon="🐑"
-                  title="Wool"
-                  value="18.5 kg"
-                  subtitle="+2.1% this week"
-                  background="#f5f3ff"
-                  color="#7c3aed"
-                />
-
-              </Grid>
-
-            </CardContent>
-
-          </Card>
-
-        </Grid>
-
-
-        {/* ALERTS */}
-
-        <Grid
-          item
-          xs={12}
-          md={4}
-        >
-
-          <Card
-            sx={{
-              height: "100%",
-              borderRadius: 4,
-              boxShadow: "none",
-              border: "1px solid #e5e7eb",
-            }}
-          >
-
-            <CardContent
-              sx={{
-                p: 3,
-              }}
-            >
-
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 2,
-                }}
-              >
-
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 1,
-                  }}
-                >
-
-                  <NotificationsActive
-                    sx={{
-                      color: "#ea580c",
-                    }}
-                  />
-
-                  <Typography
-                    variant="h6"
-                    fontWeight={900}
-                  >
-                    Alerts
-                  </Typography>
-
-                </Box>
-
-                <Chip
-                  label="5"
-                  size="small"
-                  sx={{
-                    backgroundColor: "#ffedd5",
-                    color: "#c2410c",
-                    fontWeight: 900,
-                  }}
-                />
-
-              </Box>
-
-
-              <AlertRow
-                title="Animal health warning"
-                subtitle="Cow #COW024"
-                color="#ef4444"
               />
-
-              <AlertRow
-                title="Vaccination due"
-                subtitle="Goat #GOAT012"
-                color="#f59e0b"
-              />
-
-              <AlertRow
-                title="Temperature high"
-                subtitle="Barn 02"
-                color="#f97316"
-              />
-
-              <Button
-                fullWidth
-                endIcon={<ArrowForward />}
-                sx={{
-                  mt: 2,
-                  textTransform: "none",
-                  fontWeight: 800,
-                }}
-              >
-                View All Alerts
-              </Button>
-
-            </CardContent>
-
-          </Card>
-
-        </Grid>
-
-      </Grid>
-
-
-      {/* =====================================================
-          FARM ACTIVITY
-      ====================================================== */}
-
-      <Card
-        sx={{
-          borderRadius: 4,
-          boxShadow: "none",
-          border: "1px solid #e5e7eb",
-        }}
-      >
-
-        <CardContent
-          sx={{
-            p: 3,
-          }}
-        >
-
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              mb: 3,
-            }}
-          >
-
-            <Box>
-
-              <Typography
-                variant="h6"
-                fontWeight={900}
-              >
-                Farm Activity
-              </Typography>
-
-              <Typography
-                variant="body2"
-                color="text.secondary"
-              >
-                Latest activity across your farm
-              </Typography>
-
             </Box>
 
-            <Button
-              endIcon={<ArrowForward />}
-              sx={{
-                textTransform: "none",
-                fontWeight: 800,
-              }}
-            >
-              View Reports
-            </Button>
+            <Divider sx={{ mb: 2 }} />
 
-          </Box>
+            {loading ? (
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent:
+                    "center",
+                  py: 5,
+                }}
+              >
+                <CircularProgress />
+              </Box>
+            ) : animals.length === 0 ? (
+              <Box
+                sx={{
+                  textAlign: "center",
+                  py: 5,
+                }}
+              >
+                <Pets
+                  sx={{
+                    fontSize: 50,
+                    color: "#cbd5e1",
+                    mb: 1,
+                  }}
+                />
 
+                <Typography
+                  sx={{
+                    color: "#64748b",
+                    fontWeight: 600,
+                  }}
+                >
+                  No animals registered yet.
+                </Typography>
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    sm: "repeat(2, 1fr)",
+                  },
+                  gap: 2,
+                }}
+              >
+                {animals
+                  .slice(0, 6)
+                  .map((animal) => (
+                    <Box
+                      key={getAnimalId(
+                        animal
+                      )}
+                      sx={{
+                        display: "flex",
+                        alignItems:
+                          "center",
+                        gap: 1.5,
+                        p: 1.5,
+                        borderRadius: 3,
+                        backgroundColor:
+                          "#f8fafc",
+                        border:
+                          "1px solid #e2e8f0",
+                      }}
+                    >
+                      <Avatar
+                        sx={{
+                          width: 44,
+                          height: 44,
+                          backgroundColor:
+                            "#dcfce7",
+                          color:
+                            "#15803d",
+                        }}
+                      >
+                        <Pets fontSize="small" />
+                      </Avatar>
 
-          <Grid
-            container
-            spacing={2}
-          >
+                      <Box
+                        sx={{
+                          minWidth: 0,
+                          flex: 1,
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            fontWeight: 800,
+                            color:
+                              "#0f172a",
+                            overflow:
+                              "hidden",
+                            textOverflow:
+                              "ellipsis",
+                            whiteSpace:
+                              "nowrap",
+                          }}
+                        >
+                          {getAnimalName(
+                            animal
+                          )}
+                        </Typography>
 
-            <ActivityCard
-              icon={<Pets />}
-              title="Animals monitored"
-              value="147"
-              description="All animals are being monitored"
-              color="#2563eb"
-              background="#eff6ff"
-            />
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color:
+                              "#64748b",
+                          }}
+                        >
+                          {getSpecies(
+                            animal
+                          )}
+                        </Typography>
+                      </Box>
 
-            <ActivityCard
-              icon={<WaterDrop />}
-              title="Water systems"
-              value="8 / 8"
-              description="All water systems operational"
-              color="#0891b2"
-              background="#ecfeff"
-            />
+                      <Chip
+                        label={getStatus(
+                          animal
+                        )}
+                        size="small"
+                        color={getStatusColor(
+                          getStatus(
+                            animal
+                          )
+                        )}
+                        sx={{
+                          fontWeight: 700,
+                        }}
+                      />
+                    </Box>
+                  ))}
+              </Box>
+            )}
 
-            <ActivityCard
-              icon={<Restaurant />}
-              title="Feed systems"
-              value="6 / 6"
-              description="All feeding systems active"
-              color="#16a34a"
-              background="#f0fdf4"
-            />
+            {animals.length > 6 && (
+              <Button
+                endIcon={
+                  <ArrowForward />
+                }
+                sx={{
+                  mt: 2,
+                  textTransform:
+                    "none",
+                  fontWeight: 700,
+                }}
+                onClick={() =>
+                  navigate("/animals")
+                }
+              >
+                View all animals
+              </Button>
+            )}
+          </CardContent>
+        </Card>
 
-            <ActivityCard
-              icon={<Thermostat />}
-              title="Barn temperature"
-              value="24°C"
-              description="Optimal environment"
-              color="#7c3aed"
-              background="#f5f3ff"
-            />
+        {/* ===================================================
+            FARM HEALTH
+        =================================================== */}
 
-          </Grid>
-
-        </CardContent>
-
-      </Card>
-
-
-      {/* =====================================================
-          FOOTER
-      ====================================================== */}
-
-      <Box
-        sx={{
-          mt: 3,
-          textAlign: "center",
-        }}
-      >
-
-        <Typography
-          variant="body2"
-          color="text.secondary"
-        >
-          AgroLens PLF • Precision Livestock Farming
-          Dashboard
-        </Typography>
-
-      </Box>
-
-    </Box>
-  );
-}
-
-
-/* ==========================================================
-   STAT CARD
-========================================================== */
-
-function StatCard({
-  title,
-  value,
-  subtitle,
-  icon,
-  background,
-  iconBackground,
-  iconColor,
-  trend,
-  alert,
-}) {
-
-  return (
-    <Grid
-      item
-      xs={12}
-      sm={6}
-      md={3}
-    >
-
-      <Card
-        sx={{
-          borderRadius: 4,
-          boxShadow: "none",
-          border: "1px solid #e5e7eb",
-          height: "100%",
-          backgroundColor: "#ffffff",
-        }}
-      >
-
-        <CardContent
+        <Card
+          elevation={0}
           sx={{
-            p: 2.5,
+            borderRadius: 4,
+            border:
+              "1px solid #e2e8f0",
           }}
         >
-
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-            }}
-          >
-
-            <Avatar
+          <CardContent sx={{ p: 3 }}>
+            <Typography
+              variant="h6"
               sx={{
-                width: 48,
-                height: 48,
-                backgroundColor:
-                  iconBackground,
-                color: iconColor,
+                fontWeight: 800,
+                color: "#0f172a",
+                mb: 2,
               }}
             >
-              {icon}
-            </Avatar>
+              Farm Health
+            </Typography>
 
-
-            {trend && (
-              <Chip
-                icon={<TrendingUp />}
-                label="Up"
-                size="small"
+            <Box
+              sx={{
+                display: "flex",
+                alignItems:
+                  "center",
+                gap: 2,
+                p: 2,
+                borderRadius: 3,
+                backgroundColor:
+                  "#f0fdf4",
+                mb: 2,
+              }}
+            >
+              <Avatar
                 sx={{
-                  backgroundColor: "#dcfce7",
-                  color: "#15803d",
-                  fontWeight: 800,
+                  backgroundColor:
+                    "#dcfce7",
+                  color: "#16a34a",
                 }}
-              />
-            )}
+              >
+                <CheckCircle />
+              </Avatar>
 
+              <Box>
+                <Typography
+                  fontWeight={800}
+                  color="#166534"
+                >
+                  System Healthy
+                </Typography>
 
-            {alert && (
-              <Chip
-                label="Attention"
-                size="small"
+                <Typography
+                  variant="body2"
+                  color="#64748b"
+                >
+                  Livestock monitoring is active.
+                </Typography>
+              </Box>
+            </Box>
+
+            <Box
+              sx={{
+                display: "flex",
+                alignItems:
+                  "center",
+                gap: 2,
+                p: 2,
+                borderRadius: 3,
+                backgroundColor:
+                  "#fffbeb",
+                mb: 2,
+              }}
+            >
+              <Avatar
                 sx={{
-                  backgroundColor: "#ffedd5",
-                  color: "#c2410c",
-                  fontWeight: 800,
+                  backgroundColor:
+                    "#fef3c7",
+                  color: "#d97706",
                 }}
-              />
-            )}
+              >
+                <WarningAmber />
+              </Avatar>
 
-          </Box>
+              <Box>
+                <Typography
+                  fontWeight={800}
+                  color="#92400e"
+                >
+                  Alerts
+                </Typography>
 
+                <Typography
+                  variant="body2"
+                  color="#64748b"
+                >
+                  No critical alerts detected.
+                </Typography>
+              </Box>
+            </Box>
 
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{
-              mt: 2,
-            }}
-          >
-            {title}
-          </Typography>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems:
+                  "center",
+                gap: 2,
+                p: 2,
+                borderRadius: 3,
+                backgroundColor:
+                  "#eff6ff",
+              }}
+            >
+              <Avatar
+                sx={{
+                  backgroundColor:
+                    "#dbeafe",
+                  color: "#2563eb",
+                }}
+              >
+                <TrendingUp />
+              </Avatar>
 
+              <Box>
+                <Typography
+                  fontWeight={800}
+                  color="#1e40af"
+                >
+                  AI Monitoring
+                </Typography>
 
-          <Typography
-            variant="h4"
-            fontWeight={900}
-            sx={{
-              mt: 0.5,
-            }}
-          >
-            {value}
-          </Typography>
+                <Typography
+                  variant="body2"
+                  color="#64748b"
+                >
+                  AI insights are available.
+                </Typography>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      </Box>
 
+      {/* =====================================================
+          PRODUCTION MANAGEMENT
+      ====================================================== */}
 
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{
-              mt: 0.5,
-            }}
-          >
-            {subtitle}
-          </Typography>
-
-        </CardContent>
-
-      </Card>
-
-    </Grid>
-  );
-}
-
-
-/* ==========================================================
-   HEALTH BAR
-========================================================== */
-
-function HealthBar({
-  label,
-  value,
-  color,
-}) {
-
-  return (
-    <Box
-      sx={{
-        mb: 2.5,
-      }}
-    >
+      <Typography
+        variant="h6"
+        sx={{
+          fontWeight: 800,
+          color: "#0f172a",
+          mb: 2,
+        }}
+      >
+        Production Management
+      </Typography>
 
       <Box
         sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          mb: 0.8,
-        }}
-      >
-
-        <Typography
-          variant="body2"
-          fontWeight={700}
-        >
-          {label}
-        </Typography>
-
-        <Typography
-          variant="body2"
-          fontWeight={900}
-        >
-          {value}%
-        </Typography>
-
-      </Box>
-
-      <LinearProgress
-        variant="determinate"
-        value={value}
-        sx={{
-          height: 9,
-          borderRadius: 10,
-          backgroundColor: "#e5e7eb",
-
-          "& .MuiLinearProgress-bar": {
-            backgroundColor: color,
-            borderRadius: 10,
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "repeat(2, 1fr)",
+            lg: "repeat(4, 1fr)",
           },
-        }}
-      />
-
-    </Box>
-  );
-}
-
-
-/* ==========================================================
-   MINI AI CARD
-========================================================== */
-
-function MiniAI({
-  icon,
-  value,
-  label,
-}) {
-
-  return (
-    <Box
-      sx={{
-        flex: 1,
-        p: 1.5,
-        borderRadius: 3,
-        backgroundColor: "#ffffff",
-        textAlign: "center",
-      }}
-    >
-
-      <Box
-        sx={{
-          color: "#7c3aed",
-          mb: 0.5,
+          gap: 2.5,
         }}
       >
-        {icon}
+        <ProductionCard
+          icon={<LocalDrink />}
+          title="Milk Production"
+          description={
+            statistics.milk == null
+              ? "Milk records unavailable."
+              : `${statistics.milk} live milk record${
+                  statistics.milk === 1
+                    ? ""
+                    : "s"
+                }.`
+          }
+          color="#2563eb"
+          background="#dbeafe"
+          path="/milk"
+        />
+
+        <ProductionCard
+          icon={<Egg />}
+          title="Egg Production"
+          description={
+            statistics.eggs == null
+              ? "Egg records unavailable."
+              : `${statistics.eggs} live egg record${
+                  statistics.eggs === 1
+                    ? ""
+                    : "s"
+                }.`
+          }
+          color="#ca8a04"
+          background="#fef9c3"
+          path="/eggs"
+        />
+
+        <ProductionCard
+          icon={<Texture />}
+          title="Wool Production"
+          description={
+            statistics.wool == null
+              ? "Wool records unavailable."
+              : `${statistics.wool} live wool record${
+                  statistics.wool === 1
+                    ? ""
+                    : "s"
+                }.`
+          }
+          color="#db2777"
+          background="#fce7f3"
+          path="/wool"
+        />
+
+        <ProductionCard
+          icon={<Grass />}
+          title="Feed Management"
+          description={
+            statistics.feed == null
+              ? "Feed records unavailable."
+              : `${statistics.feed} live feed record${
+                  statistics.feed === 1
+                    ? ""
+                    : "s"
+                }.`
+          }
+          color="#65a30a"
+          background="#ecfccb"
+          path="/feed"
+        />
       </Box>
-
-      <Typography
-        fontWeight={900}
-      >
-        {value}
-      </Typography>
-
-      <Typography
-        variant="caption"
-        color="text.secondary"
-      >
-        {label}
-      </Typography>
-
     </Box>
   );
 }
 
-
-/* ==========================================================
+/* =========================================================
    PRODUCTION CARD
-========================================================== */
+========================================================= */
 
 function ProductionCard({
   icon,
   title,
-  value,
-  subtitle,
-  background,
-  color,
-}) {
-
-  return (
-    <Grid
-      item
-      xs={12}
-      sm={4}
-    >
-
-      <Box
-        sx={{
-          p: 2,
-          borderRadius: 3,
-          backgroundColor: background,
-          height: "100%",
-        }}
-      >
-
-        <Typography
-          sx={{
-            fontSize: 30,
-          }}
-        >
-          {icon}
-        </Typography>
-
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{
-            mt: 1,
-          }}
-        >
-          {title}
-        </Typography>
-
-        <Typography
-          variant="h5"
-          fontWeight={900}
-          sx={{
-            mt: 0.5,
-            color: color,
-          }}
-        >
-          {value}
-        </Typography>
-
-        <Typography
-          variant="caption"
-          color="text.secondary"
-        >
-          {subtitle}
-        </Typography>
-
-      </Box>
-
-    </Grid>
-  );
-}
-
-
-/* ==========================================================
-   ALERT ROW
-========================================================== */
-
-function AlertRow({
-  title,
-  subtitle,
-  color,
-}) {
-
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        gap: 1.5,
-        alignItems: "center",
-        py: 1.5,
-      }}
-    >
-
-      <Box
-        sx={{
-          width: 10,
-          height: 10,
-          borderRadius: "50%",
-          backgroundColor: color,
-          flexShrink: 0,
-        }}
-      />
-
-      <Box
-        sx={{
-          flex: 1,
-        }}
-      >
-
-        <Typography
-          variant="body2"
-          fontWeight={800}
-        >
-          {title}
-        </Typography>
-
-        <Typography
-          variant="caption"
-          color="text.secondary"
-        >
-          {subtitle}
-        </Typography>
-
-      </Box>
-
-    </Box>
-  );
-}
-
-
-/* ==========================================================
-   ACTIVITY CARD
-========================================================== */
-
-function ActivityCard({
-  icon,
-  title,
-  value,
   description,
   color,
   background,
+  path,
 }) {
+  const navigate = useNavigate();
 
   return (
-    <Grid
-      item
-      xs={12}
-      sm={6}
-      md={3}
+    <Card
+      elevation={0}
+      sx={{
+        borderRadius: 4,
+        border:
+          "1px solid #e2e8f0",
+        cursor: "pointer",
+
+        transition:
+          "all 0.2s ease",
+
+        "&:hover": {
+          transform:
+            "translateY(-4px)",
+
+          boxShadow:
+            "0 12px 30px rgba(0,0,0,0.08)",
+        },
+      }}
+      onClick={() => navigate(path)}
     >
-
-      <Box
-        sx={{
-          p: 2,
-          borderRadius: 3,
-          backgroundColor: background,
-          height: "100%",
-        }}
-      >
-
+      <CardContent>
         <Avatar
           sx={{
-            backgroundColor: "#ffffff",
-            color: color,
-            mb: 1.5,
+            width: 50,
+            height: 50,
+            backgroundColor:
+              background,
+            color,
+            mb: 2,
           }}
         >
           {icon}
         </Avatar>
 
         <Typography
-          variant="body2"
-          color="text.secondary"
+          sx={{
+            fontWeight: 800,
+            color: "#0f172a",
+            mb: 0.5,
+          }}
         >
           {title}
         </Typography>
 
         <Typography
-          variant="h5"
-          fontWeight={900}
+          variant="body2"
           sx={{
-            color: color,
-            mt: 0.5,
+            color: "#64748b",
           }}
-        >
-          {value}
-        </Typography>
-
-        <Typography
-          variant="caption"
-          color="text.secondary"
         >
           {description}
         </Typography>
-
-      </Box>
-
-    </Grid>
+      </CardContent>
+    </Card>
   );
 }

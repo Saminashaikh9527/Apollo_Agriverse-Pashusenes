@@ -1,1233 +1,642 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
+  Alert,
   Box,
-  Typography,
+  Button,
   Card,
   CardContent,
-  Grid,
-  Avatar,
-  Chip,
-  Button,
-  LinearProgress,
-  TextField,
-  MenuItem,
-  Stack,
+  CircularProgress,
   Divider,
-  Alert,
+  IconButton,
+  TextField,
+  Typography,
 } from "@mui/material";
 
 import {
-  LocalDrink,
-  TrendingUp,
-  TrendingDown,
-  Pets,
-  CalendarMonth,
-  AccessTime,
-  Analytics,
   Add,
-  Warning,
-  CheckCircle,
+  Delete,
+  LocalDrink,
+  Refresh,
 } from "@mui/icons-material";
 
-
-const animals = [
-  {
-    tag: "COW001",
-    name: "Lakshmi",
-    breed: "Gir",
-    emoji: "🐄",
-    morning: 14,
-    evening: 14,
-    target: 30,
-    quality: "Excellent",
-    status: "Normal",
-  },
-
-  {
-    tag: "COW002",
-    name: "Ganga",
-    breed: "Holstein",
-    emoji: "🐄",
-    morning: 16,
-    evening: 15,
-    target: 32,
-    quality: "Excellent",
-    status: "Normal",
-  },
-
-  {
-    tag: "COW023",
-    name: "Kamadhenu",
-    breed: "Jersey",
-    emoji: "🐄",
-    morning: 10,
-    evening: 9,
-    target: 27,
-    quality: "Good",
-    status: "Low Production",
-  },
-
-  {
-    tag: "BUF001",
-    name: "Nandini",
-    breed: "Murrah",
-    emoji: "🐃",
-    morning: 9,
-    evening: 9,
-    target: 20,
-    quality: "Excellent",
-    status: "Normal",
-  },
-];
-
+import {
+  getMilkRecords,
+  createMilkRecord,
+  deleteMilkRecord,
+} from "../api/backend";
 
 export default function Milk() {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const [selectedAnimal, setSelectedAnimal] =
-    useState("ALL");
+  const getToday = () =>
+    new Date().toISOString().split("T")[0];
 
-  const [date, setDate] =
-    useState(
-      new Date()
-        .toISOString()
-        .split("T")[0]
-    );
+  const [form, setForm] = useState({
+    animal_id: "",
+    production_date: getToday(),
+    morning_litres: "",
+    evening_litres: "",
+  });
 
+  // =====================================================
+  // LOAD MILK RECORDS
+  // =====================================================
 
-  const filteredAnimals =
-    selectedAnimal === "ALL"
-      ? animals
-      : animals.filter(
-          (animal) =>
-            animal.tag === selectedAnimal
+  const loadMilk = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const response = await getMilkRecords();
+
+      console.log("Milk records:", response);
+
+      const data = Array.isArray(response)
+        ? response
+        : response?.data ||
+          response?.records ||
+          [];
+
+      setRecords(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Milk loading error:", err);
+
+      setError(
+        err?.message ||
+          "Failed to load milk records."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMilk();
+  }, []);
+
+  // =====================================================
+  // FORM CHANGE
+  // =====================================================
+
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  };
+
+  // =====================================================
+  // CREATE MILK RECORD
+  // =====================================================
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    try {
+      setSaving(true);
+      setError("");
+
+      if (!form.animal_id) {
+        throw new Error("Animal ID is required.");
+      }
+
+      if (!form.production_date) {
+        throw new Error(
+          "Production date is required."
         );
+      }
 
+      const morning =
+        Number(form.morning_litres) || 0;
 
-  const totalMilk =
-    animals.reduce(
-      (sum, animal) =>
-        sum +
-        animal.morning +
-        animal.evening,
-      0
+      const evening =
+        Number(form.evening_litres) || 0;
+
+      if (morning < 0 || evening < 0) {
+        throw new Error(
+          "Milk quantity cannot be negative."
+        );
+      }
+
+      const payload = {
+        animal_id: Number(form.animal_id),
+        production_date: form.production_date,
+        morning_litres: morning,
+        evening_litres: evening,
+        total_litres: morning + evening,
+      };
+
+      console.log(
+        "Creating milk record:",
+        payload
+      );
+
+      await createMilkRecord(payload);
+
+      setForm({
+        animal_id: "",
+        production_date: getToday(),
+        morning_litres: "",
+        evening_litres: "",
+      });
+
+      await loadMilk();
+    } catch (err) {
+      console.error(
+        "Create milk record error:",
+        err
+      );
+
+      setError(
+        err?.message ||
+          "Failed to create milk record."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // =====================================================
+  // DELETE MILK RECORD
+  // =====================================================
+
+  const handleDelete = async (id) => {
+    if (!id) {
+      setError("Invalid milk record ID.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Delete this milk record?"
     );
 
+    if (!confirmed) {
+      return;
+    }
 
-  const totalTarget =
-    animals.reduce(
-      (sum, animal) =>
-        sum + animal.target,
-      0
-    );
+    try {
+      setError("");
 
+      await deleteMilkRecord(id);
 
-  const productionRate =
-    Math.round(
-      (totalMilk / totalTarget) * 100
-    );
+      await loadMilk();
+    } catch (err) {
+      console.error(
+        "Delete milk record error:",
+        err
+      );
 
+      setError(
+        err?.message ||
+          "Failed to delete milk record."
+      );
+    }
+  };
 
-  const lowProduction =
-    animals.filter(
-      (animal) =>
-        animal.status ===
-        "Low Production"
-    ).length;
-
+  // =====================================================
+  // UI
+  // =====================================================
 
   return (
     <Box
       sx={{
-        minHeight: "100vh",
-        backgroundColor: "#f6faf8",
         p: {
           xs: 2,
           sm: 3,
           md: 4,
         },
+        maxWidth: 1600,
+        mx: "auto",
       }}
     >
-
-      {/* =====================================================
+      {/* =================================================
           HEADER
-      ====================================================== */}
+      ================================================== */}
 
       <Box
         sx={{
           display: "flex",
-          justifyContent:
-            "space-between",
+          justifyContent: "space-between",
           alignItems: {
             xs: "flex-start",
-            md: "center",
+            sm: "center",
           },
-          flexWrap: "wrap",
+          flexDirection: {
+            xs: "column",
+            sm: "row",
+          },
           gap: 2,
           mb: 4,
         }}
       >
-
         <Box>
-
           <Typography
             variant="h4"
-            fontWeight={900}
-            color="#12372a"
+            sx={{
+              fontWeight: 900,
+              color: "#064e3b",
+            }}
           >
-            Milk Management 🥛
+            Milk Production
           </Typography>
 
           <Typography
             color="text.secondary"
             sx={{ mt: 0.5 }}
           >
-            Track milk production,
-            animal performance and
-            daily yield trends.
+            Track daily milk production for your
+            livestock.
           </Typography>
-
         </Box>
 
-
         <Button
-          variant="contained"
-          startIcon={<Add />}
+          variant="outlined"
+          startIcon={<Refresh />}
+          onClick={loadMilk}
+          disabled={loading}
           sx={{
-            borderRadius: 3,
             textTransform: "none",
-            fontWeight: 800,
-            backgroundColor:
-              "#047857",
-            px: 3,
-            "&:hover": {
-              backgroundColor:
-                "#065f46",
-            },
-          }}
-        >
-          Add Milk Record
-        </Button>
-
-      </Box>
-
-
-      {/* =====================================================
-          SUMMARY
-      ====================================================== */}
-
-      <Grid
-        container
-        spacing={2.5}
-        sx={{ mb: 4 }}
-      >
-
-        <SummaryCard
-          title="Today's Milk"
-          value={`${totalMilk} L`}
-          subtitle="Total production"
-          icon={<LocalDrink />}
-          background="#dbeafe"
-          color="#2563eb"
-        />
-
-        <SummaryCard
-          title="Daily Target"
-          value={`${totalTarget} L`}
-          subtitle="Expected production"
-          icon={<Analytics />}
-          background="#dcfce7"
-          color="#15803d"
-        />
-
-        <SummaryCard
-          title="Production Rate"
-          value={`${productionRate}%`}
-          subtitle="Actual vs target"
-          icon={<TrendingUp />}
-          background="#fef3c7"
-          color="#d97706"
-        />
-
-        <SummaryCard
-          title="Low Production"
-          value={lowProduction}
-          subtitle="Animals need attention"
-          icon={<Warning />}
-          background="#fee2e2"
-          color="#dc2626"
-        />
-
-      </Grid>
-
-
-      {/* =====================================================
-          FILTERS
-      ====================================================== */}
-
-      <Card
-        sx={{
-          mb: 3,
-          borderRadius: 4,
-          boxShadow: "none",
-          border:
-            "1px solid #e5e7eb",
-        }}
-      >
-
-        <CardContent>
-
-          <Grid
-            container
-            spacing={2}
-            alignItems="center"
-          >
-
-            <Grid
-              item
-              xs={12}
-              md={5}
-            >
-
-              <TextField
-                select
-                fullWidth
-                label="Select Animal"
-                value={selectedAnimal}
-                onChange={(e) =>
-                  setSelectedAnimal(
-                    e.target.value
-                  )
-                }
-              >
-
-                <MenuItem value="ALL">
-                  🐾 All Animals
-                </MenuItem>
-
-                {animals.map(
-                  (animal) => (
-                    <MenuItem
-                      key={animal.tag}
-                      value={animal.tag}
-                    >
-                      {animal.emoji}{" "}
-                      {animal.tag} —{" "}
-                      {animal.name}
-                    </MenuItem>
-                  )
-                )}
-
-              </TextField>
-
-            </Grid>
-
-
-            <Grid
-              item
-              xs={12}
-              md={4}
-            >
-
-              <TextField
-                fullWidth
-                type="date"
-                label="Production Date"
-                value={date}
-                onChange={(e) =>
-                  setDate(
-                    e.target.value
-                  )
-                }
-                InputLabelProps={{
-                  shrink: true,
-                }}
-              />
-
-            </Grid>
-
-
-            <Grid
-              item
-              xs={12}
-              md={3}
-            >
-
-              <Chip
-                icon={
-                  <CalendarMonth />
-                }
-                label={`Date: ${date}`}
-                sx={{
-                  height: 42,
-                  fontWeight: 700,
-                }}
-              />
-
-            </Grid>
-
-          </Grid>
-
-        </CardContent>
-
-      </Card>
-
-
-      {/* =====================================================
-          ALERT
-      ====================================================== */}
-
-      {lowProduction > 0 && (
-
-        <Alert
-          severity="warning"
-          icon={<Warning />}
-          sx={{
-            mb: 3,
-            borderRadius: 3,
+            borderRadius: 2,
             fontWeight: 700,
           }}
         >
-          AI detected reduced milk
-          production in {lowProduction}
-          animal(s). Check health,
-          nutrition and activity.
-        </Alert>
+          Refresh
+        </Button>
+      </Box>
 
+      {/* =================================================
+          ERROR
+      ================================================== */}
+
+      {error && (
+        <Alert
+          severity="error"
+          onClose={() => setError("")}
+          sx={{
+            mb: 3,
+            borderRadius: 3,
+          }}
+        >
+          {error}
+        </Alert>
       )}
 
-
-      {/* =====================================================
-          PRODUCTION TABLE
-      ====================================================== */}
-
-      <Typography
-        variant="h6"
-        fontWeight={900}
-        sx={{ mb: 2 }}
-      >
-        Today's Milk Production
-      </Typography>
-
+      {/* =================================================
+          ADD RECORD
+      ================================================== */}
 
       <Card
+        elevation={0}
         sx={{
           borderRadius: 4,
-          boxShadow: "none",
-          border:
-            "1px solid #e5e7eb",
+          border: "1px solid #e2e8f0",
           mb: 4,
         }}
       >
+        <CardContent sx={{ p: 3 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              mb: 3,
+            }}
+          >
+            <LocalDrink color="primary" />
 
-        <CardContent>
+            <Typography
+              variant="h6"
+              fontWeight={800}
+            >
+              Add Milk Record
+            </Typography>
+          </Box>
 
-          {filteredAnimals.map(
-            (animal, index) => {
+          <Box
+            component="form"
+            onSubmit={handleSubmit}
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                sm: "repeat(2, 1fr)",
+                lg: "repeat(5, 1fr)",
+              },
+              gap: 2,
+            }}
+          >
+            {/* ANIMAL ID */}
 
-              const total =
-                animal.morning +
-                animal.evening;
+            <TextField
+              label="Animal ID"
+              name="animal_id"
+              type="number"
+              value={form.animal_id}
+              onChange={handleChange}
+              required
+              slotProps={{
+                htmlInput: {
+                  min: 1,
+                  step: 1,
+                },
+              }}
+            />
 
-              const percentage =
-                Math.min(
-                  Math.round(
-                    (total /
-                      animal.target) *
-                      100
-                  ),
-                  100
-                );
+            {/* PRODUCTION DATE */}
 
+            <TextField
+              label="Production Date"
+              name="production_date"
+              type="date"
+              value={form.production_date}
+              onChange={handleChange}
+              required
+              slotProps={{
+                inputLabel: {
+                  shrink: true,
+                },
+              }}
+            />
 
-              return (
-                <Box
-                  key={animal.tag}
-                >
+            {/* MORNING */}
 
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems:
-                        "center",
-                      justifyContent:
-                        "space-between",
-                      gap: 2,
-                      flexWrap: "wrap",
-                      py: 2,
-                    }}
-                  >
+            <TextField
+              label="Morning Litres"
+              name="morning_litres"
+              type="number"
+              value={form.morning_litres}
+              onChange={handleChange}
+              required
+              slotProps={{
+                htmlInput: {
+                  min: 0,
+                  step: 0.1,
+                },
+              }}
+            />
 
-                    {/* Animal */}
+            {/* EVENING */}
 
-                    <Box
-                      sx={{
-                        display:
-                          "flex",
-                        alignItems:
-                          "center",
-                        gap: 1.5,
-                        minWidth: 180,
-                      }}
-                    >
+            <TextField
+              label="Evening Litres"
+              name="evening_litres"
+              type="number"
+              value={form.evening_litres}
+              onChange={handleChange}
+              required
+              slotProps={{
+                htmlInput: {
+                  min: 0,
+                  step: 0.1,
+                },
+              }}
+            />
 
-                      <Avatar
-                        sx={{
-                          width: 52,
-                          height: 52,
-                          fontSize: 29,
-                          backgroundColor:
-                            "#dbeafe",
-                        }}
-                      >
-                        {animal.emoji}
-                      </Avatar>
+            {/* SUBMIT */}
 
-                      <Box>
-
-                        <Typography
-                          fontWeight={900}
-                        >
-                          {animal.tag}
-                        </Typography>
-
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                        >
-                          {animal.name} •{" "}
-                          {animal.breed}
-                        </Typography>
-
-                      </Box>
-
-                    </Box>
-
-
-                    {/* Morning */}
-
-                    <ProductionBox
-                      label="Morning"
-                      value={`${animal.morning} L`}
-                      icon={
-                        <AccessTime />
-                      }
-                      color="#2563eb"
-                    />
-
-
-                    {/* Evening */}
-
-                    <ProductionBox
-                      label="Evening"
-                      value={`${animal.evening} L`}
-                      icon={
-                        <AccessTime />
-                      }
-                      color="#7c3aed"
-                    />
-
-
-                    {/* Total */}
-
-                    <ProductionBox
-                      label="Total"
-                      value={`${total} L`}
-                      icon={
-                        <LocalDrink />
-                      }
-                      color="#059669"
-                    />
-
-
-                    {/* Status */}
-
-                    <Box>
-
-                      <Chip
-                        size="small"
-                        icon={
-                          animal.status ===
-                          "Normal"
-                            ? <CheckCircle />
-                            : <Warning />
-                        }
-                        label={
-                          animal.status
-                        }
-                        sx={{
-                          fontWeight: 800,
-                          backgroundColor:
-                            animal.status ===
-                            "Normal"
-                              ? "#dcfce7"
-                              : "#fef3c7",
-                          color:
-                            animal.status ===
-                            "Normal"
-                              ? "#166534"
-                              : "#92400e",
-                        }}
-                      />
-
-                    </Box>
-
-                  </Box>
-
-
-                  {/* Progress */}
-
-                  <Box
-                    sx={{
-                      pl: {
-                        xs: 0,
-                        md: 8,
-                      },
-                      pr: 2,
-                      pb: 2,
-                    }}
-                  >
-
-                    <Box
-                      sx={{
-                        display:
-                          "flex",
-                        justifyContent:
-                          "space-between",
-                        mb: 0.5,
-                      }}
-                    >
-
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                      >
-                        Production
-                        progress
-                      </Typography>
-
-                      <Typography
-                        variant="caption"
-                        fontWeight={800}
-                      >
-                        {percentage}% of
-                        target
-                      </Typography>
-
-                    </Box>
-
-
-                    <LinearProgress
-                      variant="determinate"
-                      value={
-                        percentage
-                      }
-                      sx={{
-                        height: 7,
-                        borderRadius: 5,
-                        backgroundColor:
-                          "#e5e7eb",
-
-                        "& .MuiLinearProgress-bar":
-                          {
-                            borderRadius: 5,
-                            backgroundColor:
-                              percentage >=
-                              90
-                                ? "#16a34a"
-                                : "#f59e0b",
-                          },
-                      }}
-                    />
-
-                  </Box>
-
-
-                  {index <
-                    filteredAnimals.length -
-                      1 && (
-                    <Divider />
-                  )}
-
-                </Box>
-              );
-            }
-          )}
-
+            <Button
+              type="submit"
+              variant="contained"
+              startIcon={
+                saving ? (
+                  <CircularProgress
+                    size={20}
+                    color="inherit"
+                  />
+                ) : (
+                  <Add />
+                )
+              }
+              disabled={saving}
+              sx={{
+                minHeight: 56,
+                borderRadius: 2,
+                textTransform: "none",
+                fontWeight: 800,
+              }}
+            >
+              {saving
+                ? "Saving..."
+                : "Add Record"}
+            </Button>
+          </Box>
         </CardContent>
-
       </Card>
 
-
-      {/* =====================================================
-          PRODUCTION ANALYTICS
-      ====================================================== */}
-
-      <Grid
-        container
-        spacing={2.5}
-      >
-
-        {/* MORNING VS EVENING */}
-
-        <Grid
-          item
-          xs={12}
-          md={6}
-        >
-
-          <Card
-            sx={{
-              borderRadius: 4,
-              height: "100%",
-              boxShadow: "none",
-              border:
-                "1px solid #e5e7eb",
-            }}
-          >
-
-            <CardContent>
-
-              <Typography
-                variant="h6"
-                fontWeight={900}
-                sx={{ mb: 3 }}
-              >
-                Morning vs Evening
-              </Typography>
-
-
-              <ProductionComparison
-                label="Morning Production"
-                value={49}
-                target={totalMilk}
-                icon={
-                  <TrendingUp />
-                }
-                color="#2563eb"
-              />
-
-
-              <ProductionComparison
-                label="Evening Production"
-                value={47}
-                target={totalMilk}
-                icon={
-                  <TrendingDown />
-                }
-                color="#7c3aed"
-              />
-
-
-              <Box
-                sx={{
-                  mt: 3,
-                  p: 2,
-                  borderRadius: 3,
-                  backgroundColor:
-                    "#eff6ff",
-                }}
-              >
-
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                >
-                  PRODUCTION INSIGHT
-                </Typography>
-
-                <Typography
-                  fontWeight={800}
-                  sx={{ mt: 0.5 }}
-                >
-                  Morning production is
-                  slightly higher than
-                  evening production.
-                </Typography>
-
-              </Box>
-
-            </CardContent>
-
-          </Card>
-
-        </Grid>
-
-
-        {/* AI INSIGHT */}
-
-        <Grid
-          item
-          xs={12}
-          md={6}
-        >
-
-          <Card
-            sx={{
-              borderRadius: 4,
-              height: "100%",
-              color: "white",
-              background:
-                "linear-gradient(135deg, #064e3b, #059669)",
-            }}
-          >
-
-            <CardContent sx={{ p: 3 }}>
-
-              <Box
-                sx={{
-                  display:
-                    "flex",
-                  alignItems:
-                    "center",
-                  gap: 2,
-                  mb: 3,
-                }}
-              >
-
-                <Avatar
-                  sx={{
-                    backgroundColor:
-                      "rgba(255,255,255,0.15)",
-                  }}
-                >
-                  🤖
-                </Avatar>
-
-                <Box>
-
-                  <Typography
-                    variant="h6"
-                    fontWeight={900}
-                  >
-                    AI Milk Prediction
-                  </Typography>
-
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      opacity: 0.8,
-                    }}
-                  >
-                    AgroLens AI analysis
-                  </Typography>
-
-                </Box>
-
-              </Box>
-
-
-              <Typography
-                sx={{
-                  fontSize: 38,
-                  fontWeight: 900,
-                }}
-              >
-                198 L
-              </Typography>
-
-
-              <Typography
-                sx={{
-                  opacity: 0.8,
-                  mb: 3,
-                }}
-              >
-                Predicted production
-                for tomorrow
-              </Typography>
-
-
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: 3,
-                  backgroundColor:
-                    "rgba(255,255,255,0.1)",
-                }}
-              >
-
-                <Typography
-                  fontWeight={800}
-                >
-                  📈 Expected increase:
-                  +4.2%
-                </Typography>
-
-                <Typography
-                  variant="body2"
-                  sx={{
-                    opacity: 0.75,
-                    mt: 0.5,
-                  }}
-                >
-                  Based on recent
-                  production, feed intake
-                  and animal activity.
-                </Typography>
-
-              </Box>
-
-            </CardContent>
-
-          </Card>
-
-        </Grid>
-
-      </Grid>
-
-
-      {/* =====================================================
-          RECORD SECTION
-      ====================================================== */}
+      {/* =================================================
+          RECORDS
+      ================================================== */}
 
       <Card
+        elevation={0}
         sx={{
-          mt: 4,
           borderRadius: 4,
-          boxShadow: "none",
-          border:
-            "1px solid #e5e7eb",
+          border: "1px solid #e2e8f0",
         }}
       >
-
-        <CardContent>
-
+        <CardContent sx={{ p: 3 }}>
           <Typography
             variant="h6"
-            fontWeight={900}
-            sx={{ mb: 3 }}
+            fontWeight={800}
+            sx={{ mb: 2 }}
           >
-            Record Milk Production
+            Milk Records
           </Typography>
 
+          <Divider sx={{ mb: 2 }} />
 
-          <Grid
-            container
-            spacing={2}
-          >
+          {/* LOADING */}
 
-            <Grid
-              item
-              xs={12}
-              md={3}
+          {loading ? (
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                py: 6,
+              }}
             >
+              <CircularProgress />
+            </Box>
+          ) : records.length === 0 ? (
+            /* EMPTY */
 
-              <TextField
-                select
-                fullWidth
-                label="Animal"
-                defaultValue="COW001"
-              >
-
-                {animals.map(
-                  (animal) => (
-                    <MenuItem
-                      key={animal.tag}
-                      value={animal.tag}
-                    >
-                      {animal.emoji}{" "}
-                      {animal.tag}
-                    </MenuItem>
-                  )
-                )}
-
-              </TextField>
-
-            </Grid>
-
-
-            <Grid
-              item
-              xs={12}
-              md={3}
+            <Box
+              sx={{
+                textAlign: "center",
+                py: 6,
+              }}
             >
-
-              <TextField
-                fullWidth
-                type="number"
-                label="Morning Milk (L)"
-                defaultValue="14"
-              />
-
-            </Grid>
-
-
-            <Grid
-              item
-              xs={12}
-              md={3}
-            >
-
-              <TextField
-                fullWidth
-                type="number"
-                label="Evening Milk (L)"
-                defaultValue="14"
-              />
-
-            </Grid>
-
-
-            <Grid
-              item
-              xs={12}
-              md={3}
-            >
-
-              <Button
-                fullWidth
-                variant="contained"
-                startIcon={<Add />}
+              <LocalDrink
                 sx={{
-                  height: 56,
-                  borderRadius: 2.5,
-                  fontWeight: 800,
-                  backgroundColor:
-                    "#047857",
-                  "&:hover": {
-                    backgroundColor:
-                      "#065f46",
-                  },
+                  fontSize: 55,
+                  color: "#cbd5e1",
                 }}
+              />
+
+              <Typography
+                color="text.secondary"
+                fontWeight={600}
               >
-                Save Record
-              </Button>
+                No milk records found.
+              </Typography>
+            </Box>
+          ) : (
+            /* RECORD GRID */
 
-            </Grid>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  md: "repeat(2, 1fr)",
+                  lg: "repeat(3, 1fr)",
+                },
+                gap: 2,
+              }}
+            >
+              {records.map((record) => {
+                const recordId =
+                  record?.milk_id ??
+                  record?.id;
 
-          </Grid>
+                return (
+                  <Card
+                    key={recordId}
+                    elevation={0}
+                    sx={{
+                      borderRadius: 3,
+                      border:
+                        "1px solid #e2e8f0",
+                      backgroundColor:
+                        "#f8fafc",
+                    }}
+                  >
+                    <CardContent>
+                      {/* HEADER */}
 
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent:
+                            "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <Box>
+                          <Typography
+                            fontWeight={800}
+                          >
+                            Animal #
+                            {record?.animal_id ??
+                              "—"}
+                          </Typography>
+
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                          >
+                            {record?.production_date ??
+                              "—"}
+                          </Typography>
+                        </Box>
+
+                        <IconButton
+                          color="error"
+                          onClick={() =>
+                            handleDelete(
+                              recordId
+                            )
+                          }
+                          disabled={!recordId}
+                        >
+                          <Delete />
+                        </IconButton>
+                      </Box>
+
+                      <Divider sx={{ my: 2 }} />
+
+                      {/* VALUES */}
+
+                      <Box
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(3, 1fr)",
+                          gap: 1,
+                        }}
+                      >
+                        {/* MORNING */}
+
+                        <Box>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                          >
+                            Morning
+                          </Typography>
+
+                          <Typography
+                            fontWeight={800}
+                          >
+                            {record?.morning_litres ??
+                              0}{" "}
+                            L
+                          </Typography>
+                        </Box>
+
+                        {/* EVENING */}
+
+                        <Box>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                          >
+                            Evening
+                          </Typography>
+
+                          <Typography
+                            fontWeight={800}
+                          >
+                            {record?.evening_litres ??
+                              0}{" "}
+                            L
+                          </Typography>
+                        </Box>
+
+                        {/* TOTAL */}
+
+                        <Box>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                          >
+                            Total
+                          </Typography>
+
+                          <Typography
+                            fontWeight={900}
+                            color="primary"
+                          >
+                            {record?.total_litres ??
+                              0}{" "}
+                            L
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </Box>
+          )}
         </CardContent>
-
       </Card>
-
-    </Box>
-  );
-}
-
-
-/* =====================================================
-   SUMMARY CARD
-===================================================== */
-
-function SummaryCard({
-  title,
-  value,
-  subtitle,
-  icon,
-  background,
-  color,
-}) {
-
-  return (
-    <Grid
-      item
-      xs={12}
-      sm={6}
-      md={3}
-    >
-
-      <Card
-        sx={{
-          borderRadius: 4,
-          boxShadow: "none",
-          border:
-            "1px solid #e5e7eb",
-        }}
-      >
-
-        <CardContent>
-
-          <Avatar
-            sx={{
-              backgroundColor:
-                background,
-              color: color,
-              mb: 2,
-            }}
-          >
-            {icon}
-          </Avatar>
-
-
-          <Typography
-            variant="body2"
-            color="text.secondary"
-          >
-            {title}
-          </Typography>
-
-
-          <Typography
-            variant="h5"
-            fontWeight={900}
-            sx={{ mt: 0.3 }}
-          >
-            {value}
-          </Typography>
-
-
-          <Typography
-            variant="caption"
-            color="text.secondary"
-          >
-            {subtitle}
-          </Typography>
-
-        </CardContent>
-
-      </Card>
-
-    </Grid>
-  );
-}
-
-
-/* =====================================================
-   PRODUCTION BOX
-===================================================== */
-
-function ProductionBox({
-  label,
-  value,
-  icon,
-  color,
-}) {
-
-  return (
-    <Box
-      sx={{
-        minWidth: 90,
-      }}
-    >
-
-      <Box
-        sx={{
-          display: "flex",
-          alignItems:
-            "center",
-          gap: 0.5,
-          color: color,
-        }}
-      >
-
-        {icon}
-
-        <Typography
-          variant="caption"
-          color="text.secondary"
-        >
-          {label}
-        </Typography>
-
-      </Box>
-
-
-      <Typography
-        fontWeight={900}
-        sx={{
-          mt: 0.5,
-          color: color,
-        }}
-      >
-        {value}
-      </Typography>
-
-    </Box>
-  );
-}
-
-
-/* =====================================================
-   PRODUCTION COMPARISON
-===================================================== */
-
-function ProductionComparison({
-  label,
-  value,
-  target,
-  icon,
-  color,
-}) {
-
-  const percentage =
-    Math.round(
-      (value / target) * 100
-    );
-
-
-  return (
-    <Box sx={{ mb: 3 }}>
-
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent:
-            "space-between",
-          mb: 1,
-        }}
-      >
-
-        <Box
-          sx={{
-            display:
-              "flex",
-            alignItems:
-              "center",
-            gap: 1,
-          }}
-        >
-
-          <Avatar
-            sx={{
-              width: 34,
-              height: 34,
-              backgroundColor:
-                `${color}20`,
-              color: color,
-            }}
-          >
-            {icon}
-          </Avatar>
-
-          <Typography
-            fontWeight={700}
-          >
-            {label}
-          </Typography>
-
-        </Box>
-
-
-        <Typography
-          fontWeight={900}
-          color={color}
-        >
-          {value} L
-        </Typography>
-
-      </Box>
-
-
-      <LinearProgress
-        variant="determinate"
-        value={percentage}
-        sx={{
-          height: 8,
-          borderRadius: 5,
-          backgroundColor:
-            "#e5e7eb",
-
-          "& .MuiLinearProgress-bar":
-            {
-              backgroundColor:
-                color,
-              borderRadius: 5,
-            },
-        }}
-      />
-
     </Box>
   );
 }
