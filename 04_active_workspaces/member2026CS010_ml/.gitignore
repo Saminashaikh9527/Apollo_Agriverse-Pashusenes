@@ -1,0 +1,32 @@
+__pycache__/
+*.pyc
+
+ml_models/datasets/raw/
+ml_models/datasets/processed/
+
+*.pkl
+*.pt
+*.h5
+*.onnx
+
+.ipynb_checkpoints/
+*.log
+*.tmp
+# Large processed ML datasets
+ml_models/datasets/processed/
+
+# Raw datasets
+ml_models/datasets/raw/
+
+# Trained ML model files
+ml_models/src/models/*.pkl
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# YOLO weights
+*.pt
