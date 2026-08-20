@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from sqlalchemy import text
 
+
 # ============================================================
 # API ROUTES
 # ============================================================
@@ -15,60 +16,79 @@ from app.api.health.routes import router as health_router
 from app.api.milk.routes import router as milk_router
 from app.api.reports.routes import router as reports_router
 
+# AI
+from app.api.ai.routes import router as ai_router
+
+
+# ============================================================
+# OPTIONAL MODULE ROUTES
+# ============================================================
+
 try:
     from app.api.wool.routes import router as wool_router
 except ModuleNotFoundError:
     wool_router = None
+
 
 try:
     from app.api.vaccination.routes import router as vaccination_router
 except ModuleNotFoundError:
     vaccination_router = None
 
+
 try:
     from app.api.feed.routes import router as feed_router
 except ModuleNotFoundError:
     feed_router = None
+
 
 try:
     from app.api.egg.routes import router as egg_router
 except ModuleNotFoundError:
     egg_router = None
 
+
 try:
     from app.api.growth.routes import router as growth_router
 except ModuleNotFoundError:
     growth_router = None
 
+
+# ============================================================
+# CORE / DATABASE
+# ============================================================
+
 from app.core.config import CORS_ORIGINS
 
-# Register all SQLAlchemy models before handling requests.
+# Register all SQLAlchemy models
+# before handling requests.
 import app.models
 
 from app.database.connection import engine
 
 
 # ============================================================
-# CREATE FASTAPI APP
+# FASTAPI APPLICATION
 # ============================================================
 
 app = FastAPI(
     title="Apollo Agriverse PashuSense API",
+
     description=(
         "AI Powered Precision Livestock Farming System "
         "for Apollo Agriverse PashuSense"
     ),
+
     version="1.0.0",
 
-    # Disable FastAPI's default documentation routes.
-    # We create customized /docs and /redoc below.
+    # We use customized Swagger and ReDoc below.
     docs_url=None,
     redoc_url=None,
 )
 
 
 # ============================================================
-# FRONTEND HOME
+# FRONTEND
 # ============================================================
 
 FRONTEND_HOME = "http://localhost:5173/dashboard"
@@ -80,9 +100,13 @@ FRONTEND_HOME = "http://localhost:5173/dashboard"
 
 app.add_middleware(
     CORSMiddleware,
+
     allow_origins=CORS_ORIGINS,
+
     allow_credentials=True,
+
     allow_methods=["*"],
+
     allow_headers=["*"],
 )
 
@@ -91,11 +115,20 @@ app.add_middleware(
 # API ROUTES
 # ============================================================
 
+# ------------------------------------------------------------
+# Authentication
+# ------------------------------------------------------------
+
 app.include_router(
     auth_router,
     prefix="/api",
     tags=["Authentication"],
 )
+
+
+# ------------------------------------------------------------
+# Animals
+# ------------------------------------------------------------
 
 app.include_router(
     animals_router,
@@ -103,17 +136,32 @@ app.include_router(
     tags=["Animals"],
 )
 
+
+# ------------------------------------------------------------
+# Farms
+# ------------------------------------------------------------
+
 app.include_router(
     farms_router,
     prefix="/api",
     tags=["Farms"],
 )
 
+
+# ------------------------------------------------------------
+# Animal Health
+# ------------------------------------------------------------
+
 app.include_router(
     health_router,
     prefix="/api",
     tags=["Animal Health"],
 )
+
+
+# ------------------------------------------------------------
+# Milk Production
+# ------------------------------------------------------------
 
 app.include_router(
     milk_router,
@@ -123,10 +171,26 @@ app.include_router(
 
 
 # ============================================================
+# AI & COMPUTER VISION
+# ============================================================
+
+app.include_router(
+    ai_router,
+    prefix="/api",
+    tags=["AI & Computer Vision"],
+)
+
+
+# ============================================================
 # OPTIONAL MODULES
 # ============================================================
 
+# ------------------------------------------------------------
+# Wool
+# ------------------------------------------------------------
+
 if wool_router is not None:
+
     app.include_router(
         wool_router,
         prefix="/api",
@@ -134,7 +198,12 @@ if wool_router is not None:
     )
 
 
+# ------------------------------------------------------------
+# Vaccination
+# ------------------------------------------------------------
+
 if vaccination_router is not None:
+
     app.include_router(
         vaccination_router,
         prefix="/api",
@@ -142,7 +211,12 @@ if vaccination_router is not None:
     )
 
 
+# ------------------------------------------------------------
+# Feed
+# ------------------------------------------------------------
+
 if feed_router is not None:
+
     app.include_router(
         feed_router,
         prefix="/api",
@@ -150,7 +224,12 @@ if feed_router is not None:
     )
 
 
+# ------------------------------------------------------------
+# Egg
+# ------------------------------------------------------------
+
 if egg_router is not None:
+
     app.include_router(
         egg_router,
         prefix="/api",
@@ -158,7 +237,12 @@ if egg_router is not None:
     )
 
 
+# ------------------------------------------------------------
+# Growth
+# ------------------------------------------------------------
+
 if growth_router is not None:
+
     app.include_router(
         growth_router,
         prefix="/api",
@@ -178,10 +262,13 @@ app.include_router(
 
 
 # ============================================================
-# SWAGGER UI
+# CUSTOM SWAGGER UI
 # ============================================================
 
-@app.get("/docs", include_in_schema=False)
+@app.get(
+    "/docs",
+    include_in_schema=False,
+)
 async def custom_swagger_ui():
 
     response = get_swagger_ui_html(
@@ -191,9 +278,9 @@ async def custom_swagger_ui():
 
     html = response.body.decode("utf-8")
 
-    # ========================================================
+    # --------------------------------------------------------
     # BACK TO HOME BUTTON
-    # ========================================================
+    # --------------------------------------------------------
 
     home_button = f"""
     <style>
@@ -211,7 +298,9 @@ async def custom_swagger_ui():
             z-index: 999999;
 
             display: flex;
+
             align-items: center;
+
             justify-content: center;
 
             gap: 8px;
@@ -251,8 +340,8 @@ async def custom_swagger_ui():
 
             transition:
                 all 0.2s ease;
-
         }}
+
 
         #apollo-home-button:hover {{
 
@@ -268,8 +357,8 @@ async def custom_swagger_ui():
             box-shadow:
                 0 7px 18px
                 rgba(0, 0, 0, 0.25);
-
         }}
+
 
         #apollo-home-button .arrow {{
 
@@ -278,14 +367,14 @@ async def custom_swagger_ui():
             line-height: 1;
 
             font-weight: 900;
-
         }}
+
 
         #apollo-home-button .home-text {{
 
             line-height: 1;
-
         }}
+
 
         /* ====================================================
            SWAGGER TOP SPACE
@@ -294,24 +383,27 @@ async def custom_swagger_ui():
         .swagger-ui .topbar {{
 
             padding-left: 175px;
-
         }}
 
     </style>
+
 
     <a
         id="apollo-home-button"
         href="{FRONTEND_HOME}"
         title="Go back to Apollo Agriverse PashuSense Dashboard"
     >
+
         <span class="arrow">←</span>
+
         <span class="home-text">
             Back to Home
         </span>
+
     </a>
     """
 
-    # Insert our button before closing head.
+    # Insert button before </head>
     html = html.replace(
         "</head>",
         home_button + "</head>",
@@ -324,10 +416,13 @@ async def custom_swagger_ui():
 
 
 # ============================================================
-# REDOC
+# CUSTOM REDOC
 # ============================================================
 
-@app.get("/redoc", include_in_schema=False)
+@app.get(
+    "/redoc",
+    include_in_schema=False,
+)
 async def custom_redoc():
 
     response = get_redoc_html(
@@ -337,10 +432,15 @@ async def custom_redoc():
 
     html = response.body.decode("utf-8")
 
+    # --------------------------------------------------------
+    # BACK TO HOME BUTTON
+    # --------------------------------------------------------
+
     home_button = f"""
     <style>
 
         #apollo-redoc-home-button {{
+
             position: fixed;
 
             top: 18px;
@@ -385,8 +485,8 @@ async def custom_redoc():
 
             transition:
                 all 0.2s ease;
-
         }}
+
 
         #apollo-redoc-home-button:hover {{
 
@@ -402,26 +502,31 @@ async def custom_redoc():
             box-shadow:
                 0 7px 18px
                 rgba(0, 0, 0, 0.25);
-
         }}
+
 
         #apollo-redoc-home-button .arrow {{
 
             font-size: 22px;
 
             line-height: 1;
-
         }}
 
     </style>
+
 
     <a
         id="apollo-redoc-home-button"
         href="{FRONTEND_HOME}"
         title="Go back to Apollo Agriverse PashuSense Dashboard"
     >
+
         <span class="arrow">←</span>
-        <span>Back to Home</span>
+
+        <span>
+            Back to Home
+        </span>
+
     </a>
     """
 
@@ -444,6 +549,7 @@ async def custom_redoc():
 def root():
 
     return {
+
         "message": (
             "Apollo Agriverse PashuSense Backend "
             "is running"
@@ -495,10 +601,9 @@ def database_test():
             "application": (
                 "Apollo Agriverse PashuSense"
             ),
-
         }
 
-    except Exception:
+    except Exception as exc:
 
         return {
 
@@ -508,4 +613,5 @@ def database_test():
                 "Apollo Agriverse PashuSense"
             ),
 
+            "error": str(exc),
         }
