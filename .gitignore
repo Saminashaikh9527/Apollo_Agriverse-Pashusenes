@@ -1,22 +1,117 @@
+# ============================================================
+# AgroLens PLF - Git Ignore
+# ============================================================
+
+# ------------------------------------------------------------
 # Python
+# ------------------------------------------------------------
+
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 
+# ------------------------------------------------------------
 # Virtual Environment
+# ------------------------------------------------------------
+
 venv/
 .venv/
 
+# ------------------------------------------------------------
 # Environment Variables
+# ------------------------------------------------------------
+
 .env
+.env.*
 
-# VS Code
+# ------------------------------------------------------------
+# VS Code / IDE
+# ------------------------------------------------------------
+
 .vscode/
+.idea/
 
+# ------------------------------------------------------------
 # Operating System
+# ------------------------------------------------------------
+
 Thumbs.db
 .DS_Store
 
-# Python cache
+# ------------------------------------------------------------
+# Python Testing / Cache
+# ------------------------------------------------------------
+
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ============================================================
+# AgroLens ML - Large Datasets
+# ============================================================
+
+# Raw datasets
+04_active_workspaces/*/ml/datasets/RAW/
+
+# Curated datasets
+04_active_workspaces/*/ml/datasets/CURATED/
+
+# Downloaded datasets
+04_active_workspaces/*/ml/datasets/Chicken_Download/
+04_active_workspaces/*/ml/datasets/Dataset3/
+04_active_workspaces/*/ml/datasets/Dataset4/
+04_active_workspaces/*/ml/datasets/Indian_Cattle_Breed_Raw/
+04_active_workspaces/*/ml/datasets/Opendata/
+
+# Dataset annotation/data folders
+04_active_workspaces/*/ml/datasets/annotation/
+04_active_workspaces/*/ml/datasets/livestock/
+04_active_workspaces/*/ml/datasets/train/
+04_active_workspaces/*/ml/datasets/test/
+04_active_workspaces/*/ml/datasets/valid/
+04_active_workspaces/*/ml/datasets/videos/
+
+# ------------------------------------------------------------
+# Dataset Archives
+# ------------------------------------------------------------
+
+*.zip
+*.rar
+*.7z
+*.tar
+*.gz
+
+# ============================================================
+# YOLO / Machine Learning
+# ============================================================
+
+# Model weights
+*.pt
+*.pth
+*.onnx
+
+# YOLO training outputs
+runs/
+
+# Trained model directory
+04_active_workspaces/*/ml/models/
+
+# Experiment outputs
+wandb/
+mlruns/
+
+# ============================================================
+# Temporary / Generated Files
+# ============================================================
+
+*.log
+*.tmp
+*.temp
+
+# ============================================================
+# Project-specific files
+# ============================================================
+
+# ChatGPT conversation export
+chatgpt-conversation-full.txt
