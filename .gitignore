@@ -20,3 +20,8 @@ Thumbs.db
 
 # Python cache
 .pytest_cache/04_active_workspaces/member2026CS014_backend/backend/uploads/
+
+# Large generated ML datasets
+/04_active_workspaces/member2026CS010_ml/ml_models/datasets/processed/katanning/katanning_ready.csv
+
+04_active_workspaces/member2026CS010_ml/ml_models/datasets/processed/katanning/katanning_ready.csv
