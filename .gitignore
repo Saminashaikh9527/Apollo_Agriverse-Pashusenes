@@ -1,27 +1,73 @@
+# ==============================
 # Python
+# ==============================
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+.pytest_cache/
 
-# Virtual Environment
+# ==============================
+# Virtual Environments
+# ==============================
 venv/
 .venv/
 
+# ==============================
 # Environment Variables
+# ==============================
 .env
+.env.*
 
+# ==============================
 # VS Code
+# ==============================
 .vscode/
 
+# ==============================
 # Operating System
+# ==============================
 Thumbs.db
 .DS_Store
 
-# Python cache
-.pytest_cache/04_active_workspaces/member2026CS014_backend/backend/uploads/
+# ==============================
+# Jupyter
+# ==============================
+.ipynb_checkpoints/
 
-# Large generated ML datasets
-/04_active_workspaces/member2026CS010_ml/ml_models/datasets/processed/katanning/katanning_ready.csv
+# ==============================
+# Logs / Temporary Files
+# ==============================
+*.log
+*.tmp
 
-04_active_workspaces/member2026CS010_ml/ml_models/datasets/processed/katanning/katanning_ready.csv
+# ==============================
+# ML Raw Datasets
+# ==============================
+ml_models/datasets/raw/
+04_active_workspaces/member2026CS010_ml/ml_models/datasets/raw/
+
+# ==============================
+# ML Processed Datasets
+# ==============================
+ml_models/datasets/processed/
+04_active_workspaces/member2026CS010_ml/ml_models/datasets/processed/
+
+# ==============================
+# Trained ML Models
+# ==============================
+*.pkl
+*.pt
+*.h5
+*.onnx
+*.keras
+
+# ==============================
+# ML Model Files
+# ==============================
+ml_models/src/models/*.pkl
+
+# ==============================
+# Backend Uploads
+# ==============================
+04_active_workspaces/member2026CS014_backend/backend/uploads/
