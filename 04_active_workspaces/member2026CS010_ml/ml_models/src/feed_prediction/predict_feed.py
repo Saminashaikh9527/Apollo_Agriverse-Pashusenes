@@ -3,8 +3,9 @@ import joblib
 import os
 
 print("🚀 Loading model...")
+model_path = "src/models/feed_xgb_model.pkl"
 
-model_path = "models/feed_xgb_model.pkl"
+
 
 print("📂 Model exists:", os.path.exists(model_path))
 
@@ -13,7 +14,8 @@ model = joblib.load(model_path)
 print("✅ Model loaded")
 
 # Load cleaned data
-data_path = "../datasets/processed/feed/feed_clean.csv"
+data_path = "datasets/processed/feed/feed_clean.csv"
+
 
 print("📂 Data exists:", os.path.exists(data_path))
 
@@ -56,9 +58,10 @@ print(predictions[:10])
 
 # Save predictions
 output_path = (
-    "../datasets/processed/feed/"
+    "datasets/processed/feed/"
     "feed_predictions.csv"
 )
+
 
 output = pd.DataFrame({
     "prediction": predictions
