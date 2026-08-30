@@ -1,1150 +1,1771 @@
-import { useState } from "react";
+
+// ============================================================
+// src/pages/Predictions.jsx
+// Apollo AgriVerse - PashuSense
+// ML Prediction Dashboard
+//
+// IMPORTANT:
+// - NO Animal ID for ML predictions
+// - User selects ML model
+// - Backend provides model features
+// - User enters 2–3 features
+// - Sends only model_name + data
+// ============================================================
+
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import {
-  Box,
-  Typography,
-  Card,
-  CardContent,
-  Grid,
-  Chip,
-  Button,
-  LinearProgress,
-  MenuItem,
-  TextField,
-  Avatar,
-} from "@mui/material";
+  getMLModels,
+  getMLModelFeatures,
+  predictProduction,
+  getApiErrorMessage,
+} from "../api/backend";
 
-import {
-  AutoGraph,
-  LocalDrink,
-  Egg,
-  ContentCut,
-  Favorite,
-  TrendingUp,
-  Warning,
-  Psychology,
-  CalendarMonth,
-  Refresh,
-} from "@mui/icons-material";
+// ============================================================
+// MODEL GROUPS
+// ============================================================
 
+const MODEL_GROUPS = [
+  {
+    title: "Production Prediction",
+    models: [
+      {
+        name: "Egg Production",
+        keywords: [
+          "egg",
+          "egg_production",
+        ],
+      },
+      {
+        name: "Feed Cost",
+        keywords: [
+          "feed",
+          "feed_cost",
+        ],
+      },
+      {
+        name: "Milk Production",
+        keywords: [
+          "milk",
+          "milk_production",
+        ],
+      },
+      {
+        name: "Milk Forecast",
+        keywords: [
+          "milk",
+          "forecast",
+        ],
+      },
+    ],
+  },
+
+  {
+    title: "Health Prediction",
+    models: [
+      {
+        name: "Health Classification",
+        keywords: [
+          "health",
+          "classification",
+        ],
+      },
+      {
+        name: "Behaviour Anomaly",
+        keywords: [
+          "behaviour",
+          "behavior",
+          "anomaly",
+        ],
+      },
+    ],
+  },
+
+  {
+    title: "Behaviour / Activity Prediction",
+    models: [
+      {
+        name: "Grazing / Behaviour",
+        keywords: [
+          "grazing",
+          "behaviour",
+          "behavior",
+        ],
+      },
+      {
+        name: "Katanning Activity / Steps",
+        keywords: [
+          "katanning",
+          "activity",
+          "steps",
+        ],
+      },
+      {
+        name: "Murdoch Grazing Behaviour",
+        keywords: [
+          "murdoch",
+          "grazing",
+          "behaviour",
+          "behavior",
+        ],
+      },
+      {
+        name: "Muresk Activity / Steps",
+        keywords: [
+          "muresk",
+          "activity",
+          "steps",
+        ],
+      },
+      {
+        name: "Muresk Dry-Pasture Activity / Steps",
+        keywords: [
+          "muresk",
+          "dry",
+          "pasture",
+          "activity",
+          "steps",
+        ],
+      },
+      {
+        name: "Muresk Stubble Activity / Steps",
+        keywords: [
+          "muresk",
+          "stubble",
+          "activity",
+          "steps",
+        ],
+      },
+    ],
+  },
+];
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function cleanModelName(value) {
+  return String(value || "")
+    .trim();
+}
+
+function getModelDisplayName(model) {
+  if (typeof model === "string") {
+    return model;
+  }
+
+  if (!model || typeof model !== "object") {
+    return "";
+  }
+
+  return (
+    model.display_name ||
+    model.name ||
+    model.model_name ||
+    model.filename ||
+    model.file_name ||
+    ""
+  );
+}
+
+function getModelKey(model) {
+  if (typeof model === "string") {
+    return model;
+  }
+
+  if (!model || typeof model !== "object") {
+    return "";
+  }
+
+  return (
+    model.model_name ||
+    model.name ||
+    model.filename ||
+    model.file_name ||
+    ""
+  );
+}
+
+function normalizeModelsResponse(response) {
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  if (Array.isArray(response?.models)) {
+    return response.models;
+  }
+
+  if (Array.isArray(response?.data)) {
+    return response.data;
+  }
+
+  return [];
+}
+
+function normalizeFeaturesResponse(response) {
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  if (Array.isArray(response?.features)) {
+    return response.features;
+  }
+
+  if (
+    Array.isArray(
+      response?.data?.features
+    )
+  ) {
+    return response.data.features;
+  }
+
+  return [];
+}
+
+function prettifyFeatureName(feature) {
+  return String(feature || "")
+    .replace(/_/g, " ")
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (letter) =>
+      letter.toUpperCase()
+    );
+}
+
+function isNumericFeature(featureName) {
+  const name = String(
+    featureName || ""
+  ).toLowerCase();
+
+  return (
+    name.includes("age") ||
+    name.includes("weight") ||
+    name.includes("temperature") ||
+    name.includes("humidity") ||
+    name.includes("feed") ||
+    name.includes("intake") ||
+    name.includes("milk") ||
+    name.includes("egg") ||
+    name.includes("step") ||
+    name.includes("activity") ||
+    name.includes("distance") ||
+    name.includes("duration") ||
+    name.includes("cost") ||
+    name.includes("rain") ||
+    name.includes("speed") ||
+    name.includes("time") ||
+    name.includes("score") ||
+    name.includes("yield") ||
+    name.includes("production")
+  );
+}
+
+// ============================================================
+// COMPONENT
+// ============================================================
 
 export default function Predictions() {
+  // ----------------------------------------------------------
+  // MODEL STATE
+  // ----------------------------------------------------------
 
-  const [period, setPeriod] = useState("Next 30 Days");
+  const [models, setModels] =
+    useState([]);
 
-  const [refreshing, setRefreshing] =
+  const [selectedModel, setSelectedModel] =
+    useState("");
+
+  const [loadingModels, setLoadingModels] =
     useState(false);
 
+  // ----------------------------------------------------------
+  // FEATURE STATE
+  // ----------------------------------------------------------
 
-  const refreshPredictions = () => {
+  const [modelFeatures, setModelFeatures] =
+    useState([]);
 
-    setRefreshing(true);
+  const [featureValues, setFeatureValues] =
+    useState({});
 
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
+  const [loadingFeatures, setLoadingFeatures] =
+    useState(false);
 
-  };
+  // ----------------------------------------------------------
+  // PREDICTION STATE
+  // ----------------------------------------------------------
 
+  const [prediction, setPrediction] =
+    useState(null);
 
-  return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        backgroundColor: "#f5f8ff",
-        p: {
-          xs: 2,
-          sm: 3,
-          md: 4,
-        },
-      }}
-    >
+  const [predicting, setPredicting] =
+    useState(false);
 
-      {/* ================= HEADER ================= */}
+  const [error, setError] =
+    useState("");
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: {
-            xs: "flex-start",
-            md: "center",
-          },
-          flexWrap: "wrap",
-          gap: 2,
-          mb: 4,
-        }}
-      >
+  const [success, setSuccess] =
+    useState("");
 
-        <Box>
+  // ==========================================================
+  // LOAD MODELS
+  // ==========================================================
 
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1.5,
-            }}
-          >
+  useEffect(() => {
+    loadModels();
+  }, []);
 
-            <Avatar
-              sx={{
-                width: 52,
-                height: 52,
-                backgroundColor: "#ede9fe",
-                color: "#7c3aed",
-              }}
-            >
-              <AutoGraph />
-            </Avatar>
+  async function loadModels() {
+    try {
+      setLoadingModels(true);
+      setError("");
 
-            <Typography
-              variant="h4"
-              fontWeight={900}
-              color="#172554"
-            >
-              AI Predictions 🔮
-            </Typography>
+      const response =
+        await getMLModels();
 
-          </Box>
+      const loadedModels =
+        normalizeModelsResponse(
+          response
+        );
 
+      setModels(loadedModels);
 
-          <Typography
-            color="text.secondary"
-            sx={{ mt: 1 }}
-          >
-            Predict livestock health,
-            production and farm performance
-            using AI-powered analysis.
-          </Typography>
+      if (
+        loadedModels.length > 0
+      ) {
+        const firstModel =
+          getModelKey(
+            loadedModels[0]
+          );
 
-        </Box>
+        if (firstModel) {
+          setSelectedModel(
+            firstModel
+          );
+        }
+      }
+    } catch (err) {
+      console.error(
+        "GET ML MODELS ERROR:",
+        err
+      );
 
+      setError(
+        getApiErrorMessage(err)
+      );
+    } finally {
+      setLoadingModels(false);
+    }
+  }
 
-        <Button
-          variant="contained"
-          startIcon={
-            refreshing
-              ? null
-              : <Refresh />
+  // ==========================================================
+  // LOAD MODEL FEATURES
+  // ==========================================================
+
+  useEffect(() => {
+    if (!selectedModel) {
+      setModelFeatures([]);
+      setFeatureValues({});
+      return;
+    }
+
+    loadModelFeatures(
+      selectedModel
+    );
+  }, [selectedModel]);
+
+  async function loadModelFeatures(
+    modelName
+  ) {
+    try {
+      setLoadingFeatures(true);
+      setError("");
+      setSuccess("");
+      setPrediction(null);
+
+      const response =
+        await getMLModelFeatures(
+          modelName
+        );
+
+      let features =
+        normalizeFeaturesResponse(
+          response
+        );
+
+      // ------------------------------------------------------
+      // NORMALIZE FEATURE NAMES
+      // ------------------------------------------------------
+
+      features = features
+        .map((feature) => {
+          if (
+            typeof feature ===
+            "string"
+          ) {
+            return feature;
           }
-          onClick={refreshPredictions}
-          disabled={refreshing}
-          sx={{
-            borderRadius: 3,
-            textTransform: "none",
-            fontWeight: 800,
-            px: 3,
-            backgroundColor: "#7c3aed",
-            "&:hover": {
-              backgroundColor: "#6d28d9",
-            },
-          }}
-        >
-          {refreshing
-            ? "Updating..."
-            : "Refresh Predictions"}
-        </Button>
-
-      </Box>
-
-
-      {/* ================= AI STATUS ================= */}
-
-      <Card
-        sx={{
-          mb: 3,
-          borderRadius: 4,
-          color: "white",
-          background:
-            "linear-gradient(135deg, #312e81, #7c3aed)",
-        }}
-      >
-
-        <CardContent>
-
-          <Grid
-            container
-            spacing={2}
-            alignItems="center"
-          >
-
-            <Grid
-              item
-              xs={12}
-              md={8}
-            >
-
-              <Box
-                sx={{
-                  display: "flex",
-                  gap: 1.5,
-                  alignItems: "center",
-                }}
-              >
-
-                <Psychology
-                  sx={{ fontSize: 38 }}
-                />
-
-                <Box>
-
-                  <Typography
-                    variant="h6"
-                    fontWeight={900}
-                  >
-                    AI Prediction Engine Active
-                  </Typography>
-
-                  <Typography
-                    variant="body2"
-                    sx={{ opacity: 0.8 }}
-                  >
-                    Predictions are generated
-                    from animal health,
-                    production and behavioural
-                    data.
-                  </Typography>
-
-                </Box>
-
-              </Box>
-
-            </Grid>
-
-
-            <Grid
-              item
-              xs={12}
-              md={4}
-            >
-
-              <TextField
-                select
-                fullWidth
-                value={period}
-                onChange={(e) =>
-                  setPeriod(e.target.value)
-                }
-                sx={{
-                  backgroundColor:
-                    "rgba(255,255,255,0.1)",
-                  borderRadius: 2,
-
-                  "& .MuiInputLabel-root": {
-                    color: "white",
-                  },
-
-                  "& .MuiSelect-select": {
-                    color: "white",
-                  },
-
-                  "& .MuiOutlinedInput-notchedOutline":
-                    {
-                      borderColor:
-                        "rgba(255,255,255,0.4)",
-                    },
-                }}
-                label="Prediction Period"
-              >
-
-                <MenuItem value="Next 7 Days">
-                  Next 7 Days
-                </MenuItem>
-
-                <MenuItem value="Next 30 Days">
-                  Next 30 Days
-                </MenuItem>
-
-                <MenuItem value="Next 3 Months">
-                  Next 3 Months
-                </MenuItem>
-
-              </TextField>
-
-            </Grid>
-
-          </Grid>
-
-        </CardContent>
-
-      </Card>
-
-
-      {/* ================= PREDICTION CARDS ================= */}
-
-      <Grid
-        container
-        spacing={2.5}
-        sx={{ mb: 4 }}
-      >
-
-        <PredictionCard
-          title="Milk Production"
-          value="1,420 L"
-          change="+10.6%"
-          confidence="94%"
-          subtitle="Expected next month"
-          icon={<LocalDrink />}
-          background="#dbeafe"
-          color="#2563eb"
-        />
-
-        <PredictionCard
-          title="Egg Production"
-          value="9,180"
-          change="+9.0%"
-          confidence="91%"
-          subtitle="Expected next month"
-          icon={<Egg />}
-          background="#fef3c7"
-          color="#d97706"
-        />
-
-        <PredictionCard
-          title="Wool Production"
-          value="121 kg"
-          change="+12.0%"
-          confidence="87%"
-          subtitle="Expected next cycle"
-          icon={<ContentCut />}
-          background="#ede9fe"
-          color="#7c3aed"
-        />
-
-        <PredictionCard
-          title="Healthy Animals"
-          value="232"
-          change="+4.9%"
-          confidence="93%"
-          subtitle="Expected healthy count"
-          icon={<Favorite />}
-          background="#dcfce7"
-          color="#16a34a"
-        />
-
-      </Grid>
-
-
-      {/* ================= HEALTH RISK ================= */}
-
-      <Grid
-        container
-        spacing={2.5}
-      >
-
-        <Grid
-          item
-          xs={12}
-          md={7}
-        >
-
-          <Card
-            sx={{
-              borderRadius: 4,
-              boxShadow: "none",
-              border:
-                "1px solid #e5e7eb",
-              height: "100%",
-            }}
-          >
-
-            <CardContent>
-
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  mb: 3,
-                }}
-              >
-
-                <Favorite
-                  sx={{ color: "#dc2626" }}
-                />
-
-                <Typography
-                  variant="h6"
-                  fontWeight={900}
-                >
-                  Disease Risk Prediction
-                </Typography>
-
-              </Box>
-
-
-              <RiskRow
-                animal="GOAT001 — Meenu"
-                risk={82}
-                level="High"
-                color="#dc2626"
-              />
-
-              <RiskRow
-                animal="COW002 — Lakshmi"
-                risk={56}
-                level="Medium"
-                color="#d97706"
-              />
-
-              <RiskRow
-                animal="SHE001 — Moti"
-                risk={18}
-                level="Low"
-                color="#16a34a"
-              />
-
-              <RiskRow
-                animal="BUF001 — Kamadhenu"
-                risk={12}
-                level="Low"
-                color="#16a34a"
-              />
-
-              <RiskRow
-                animal="COW001 — Gauri"
-                risk={9}
-                level="Low"
-                color="#16a34a"
-              />
-
-            </CardContent>
-
-          </Card>
-
-        </Grid>
-
-
-        {/* ================= FARM TREND ================= */}
-
-        <Grid
-          item
-          xs={12}
-          md={5}
-        >
-
-          <Card
-            sx={{
-              borderRadius: 4,
-              boxShadow: "none",
-              border:
-                "1px solid #e5e7eb",
-              height: "100%",
-            }}
-          >
-
-            <CardContent>
-
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1,
-                  mb: 3,
-                }}
-              >
-
-                <TrendingUp
-                  sx={{ color: "#16a34a" }}
-                />
-
-                <Typography
-                  variant="h6"
-                  fontWeight={900}
-                >
-                  Farm Trend
-                </Typography>
-
-              </Box>
-
-
-              <TrendItem
-                label="Milk"
-                value="+10.6%"
-                color="#2563eb"
-              />
-
-              <TrendItem
-                label="Eggs"
-                value="+9.0%"
-                color="#d97706"
-              />
-
-              <TrendItem
-                label="Wool"
-                value="+12.0%"
-                color="#7c3aed"
-              />
-
-              <TrendItem
-                label="Animal Health"
-                value="+4.9%"
-                color="#16a34a"
-              />
-
-              <TrendItem
-                label="Feed Efficiency"
-                value="+7.2%"
-                color="#0891b2"
-              />
-
-            </CardContent>
-
-          </Card>
-
-        </Grid>
-
-      </Grid>
-
-
-      {/* ================= INDIVIDUAL PREDICTIONS ================= */}
-
-      <Typography
-        variant="h6"
-        fontWeight={900}
-        sx={{
-          mt: 4,
-          mb: 2,
-        }}
-      >
-        Individual Animal Predictions
-      </Typography>
-
-
-      <Grid
-        container
-        spacing={2.5}
-      >
-
-        <AnimalPrediction
-          emoji="🐄"
-          id="COW001"
-          name="Gauri"
-          prediction="High milk potential"
-          score={92}
-          result="Expected 18.5 L/day"
-          color="#2563eb"
-        />
-
-        <AnimalPrediction
-          emoji="🐄"
-          id="COW002"
-          name="Lakshmi"
-          prediction="Health attention"
-          score={58}
-          result="Monitor temperature"
-          color="#d97706"
-        />
-
-        <AnimalPrediction
-          emoji="🐃"
-          id="BUF001"
-          name="Kamadhenu"
-          prediction="Stable production"
-          score={89}
-          result="Expected 14.2 L/day"
-          color="#16a34a"
-        />
-
-        <AnimalPrediction
-          emoji="🐐"
-          id="GOAT001"
-          name="Meenu"
-          prediction="Health risk detected"
-          score={35}
-          result="Immediate observation"
-          color="#dc2626"
-        />
-
-      </Grid>
-
-
-      {/* ================= AI INSIGHTS ================= */}
-
-      <Card
-        sx={{
-          mt: 4,
-          borderRadius: 4,
-          background:
-            "linear-gradient(135deg, #172554, #2563eb)",
-          color: "white",
-        }}
-      >
-
-        <CardContent sx={{ p: 3 }}>
-
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1.5,
-              mb: 3,
-            }}
-          >
-
-            <Avatar
-              sx={{
-                backgroundColor:
-                  "rgba(255,255,255,0.15)",
-              }}
-            >
-              <AutoGraph />
-            </Avatar>
-
-            <Box>
-
-              <Typography
-                variant="h6"
-                fontWeight={900}
-              >
-                AI Recommendations
-              </Typography>
-
-              <Typography
-                variant="body2"
-                sx={{ opacity: 0.75 }}
-              >
-                Actions suggested by the
-                AgroLens prediction engine.
-              </Typography>
-
-            </Box>
-
-          </Box>
-
-
-          <Grid
-            container
-            spacing={2}
-          >
-
-            <Grid
-              item
-              xs={12}
-              md={4}
-            >
-
-              <Recommendation
-                icon={<Warning />}
-                title="Check GOAT001"
-                text="AI predicts elevated health risk. Perform a physical health check."
-              />
-
-            </Grid>
-
-
-            <Grid
-              item
-              xs={12}
-              md={4}
-            >
-
-              <Recommendation
-                icon={<LocalDrink />}
-                title="Milk Production"
-                text="Production is predicted to increase. Maintain current feeding routine."
-              />
-
-            </Grid>
-
-
-            <Grid
-              item
-              xs={12}
-              md={4}
-            >
-
-              <Recommendation
-                icon={<CalendarMonth />}
-                title="Plan Resources"
-                text="Prepare additional feed resources for the predicted production increase."
-              />
-
-            </Grid>
-
-          </Grid>
-
-        </CardContent>
-
-      </Card>
-
-
-      {/* ================= FOOTER ================= */}
-
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{
-          display: "block",
-          mt: 3,
-        }}
-      >
-        AgroLens PLF • AI predictions are
-        estimates and should support,
-        not replace, farmer and veterinary
-        decisions.
-      </Typography>
-
-    </Box>
-  );
-}
-
-
-/* =====================================================
-   PREDICTION CARD
-===================================================== */
-
-function PredictionCard({
-  title,
-  value,
-  change,
-  confidence,
-  subtitle,
-  icon,
-  background,
-  color,
-}) {
+
+          if (
+            feature &&
+            typeof feature ===
+              "object"
+          ) {
+            return (
+              feature.name ||
+              feature.feature ||
+              feature.feature_name ||
+              feature.column ||
+              ""
+            );
+          }
+
+          return "";
+        })
+        .filter(Boolean);
+
+      // ------------------------------------------------------
+      // ONLY SHOW MAXIMUM 3 FEATURES
+      // ------------------------------------------------------
+
+      features =
+        features.slice(0, 3);
+
+      setModelFeatures(
+        features
+      );
+
+      // ------------------------------------------------------
+      // RESET VALUES
+      // ------------------------------------------------------
+
+      const initialValues =
+        {};
+
+      features.forEach(
+        (feature) => {
+          initialValues[
+            feature
+          ] = "";
+        }
+      );
+
+      setFeatureValues(
+        initialValues
+      );
+    } catch (err) {
+      console.error(
+        "GET MODEL FEATURES ERROR:",
+        err
+      );
+
+      setModelFeatures([]);
+      setFeatureValues({});
+
+      setError(
+        getApiErrorMessage(err)
+      );
+    } finally {
+      setLoadingFeatures(false);
+    }
+  }
+
+  // ==========================================================
+  // FEATURE INPUT CHANGE
+  // ==========================================================
+
+  function handleFeatureChange(
+    featureName,
+    value
+  ) {
+    setFeatureValues(
+      (previous) => ({
+        ...previous,
+        [featureName]: value,
+      })
+    );
+
+    setError("");
+    setSuccess("");
+    setPrediction(null);
+  }
+
+  // ==========================================================
+  // VALIDATE FEATURES
+  // ==========================================================
+
+  const validFeatureCount =
+    useMemo(() => {
+      return modelFeatures.filter(
+        (feature) => {
+          const value =
+            featureValues[
+              feature
+            ];
+
+          return (
+            value !== undefined &&
+            value !== null &&
+            String(value).trim() !== ""
+          );
+        }
+      ).length;
+    }, [
+      modelFeatures,
+      featureValues,
+    ]);
+
+  // ==========================================================
+  // RUN PREDICTION
+  // ==========================================================
+
+  async function handlePredict(
+    event
+  ) {
+    event?.preventDefault();
+
+    setError("");
+    setSuccess("");
+    setPrediction(null);
+
+    // --------------------------------------------------------
+    // MODEL CHECK
+    // --------------------------------------------------------
+
+    if (!selectedModel) {
+      setError(
+        "Please select an ML model."
+      );
+
+      return;
+    }
+
+    // --------------------------------------------------------
+    // FEATURE CHECK
+    // --------------------------------------------------------
+
+    const enteredFeatures =
+      {};
+
+    modelFeatures.forEach(
+      (feature) => {
+        const rawValue =
+          featureValues[
+            feature
+          ];
+
+        if (
+          rawValue !==
+            undefined &&
+          rawValue !== null &&
+          String(rawValue).trim() !==
+            ""
+        ) {
+          const trimmed =
+            String(
+              rawValue
+            ).trim();
+
+          // Convert numeric values
+          // into numbers.
+          if (
+            isNumericFeature(
+              feature
+            ) &&
+            trimmed !== ""
+          ) {
+            const numericValue =
+              Number(trimmed);
+
+            if (
+              Number.isFinite(
+                numericValue
+              )
+            ) {
+              enteredFeatures[
+                feature
+              ] = numericValue;
+            } else {
+              enteredFeatures[
+                feature
+              ] = trimmed;
+            }
+          } else {
+            enteredFeatures[
+              feature
+            ] = trimmed;
+          }
+        }
+      }
+    );
+
+    const featureCount =
+      Object.keys(
+        enteredFeatures
+      ).length;
+
+    // --------------------------------------------------------
+    // REQUIRE 2–3 INPUTS
+    // --------------------------------------------------------
+
+    if (
+      featureCount < 2
+    ) {
+      setError(
+        "Please enter at least 2 prediction features."
+      );
+
+      return;
+    }
+
+    if (
+      featureCount > 3
+    ) {
+      setError(
+        "Please enter only 2 or 3 prediction features."
+      );
+
+      return;
+    }
+
+    // --------------------------------------------------------
+    // IMPORTANT:
+    // REMOVE ANY ANIMAL ID ACCIDENTALLY PRESENT
+    // --------------------------------------------------------
+
+    delete enteredFeatures.animal_id;
+    delete enteredFeatures.animalId;
+    delete enteredFeatures.id;
+
+    // --------------------------------------------------------
+    // PREDICT
+    // --------------------------------------------------------
+
+    try {
+      setPredicting(true);
+
+      console.log(
+        "================================="
+      );
+
+      console.log(
+        "RUNNING ML PREDICTION"
+      );
+
+      console.log(
+        "MODEL:",
+        selectedModel
+      );
+
+      console.log(
+        "FEATURES:",
+        enteredFeatures
+      );
+
+      console.log(
+        "FEATURE COUNT:",
+        Object.keys(
+          enteredFeatures
+        ).length
+      );
+
+      console.log(
+        "================================="
+      );
+
+      // ------------------------------------------------------
+      // IMPORTANT:
+      // ONLY TWO ARGUMENTS
+      //
+      // predictProduction(
+      //   modelName,
+      //   features
+      // )
+      //
+      // NO ANIMAL ID
+      // ------------------------------------------------------
+
+      const result =
+        await predictProduction(
+          selectedModel,
+          enteredFeatures
+        );
+
+      console.log(
+        "ML PREDICTION RESULT:",
+        result
+      );
+
+      setPrediction(
+        result
+      );
+
+      setSuccess(
+        "Prediction completed successfully."
+      );
+    } catch (err) {
+      console.error(
+        "PREDICTION ERROR:",
+        err
+      );
+
+      setError(
+        err?.message ||
+        getApiErrorMessage(err)
+      );
+    } finally {
+      setPredicting(false);
+    }
+  }
+
+  // ==========================================================
+  // DISPLAY MODEL NAME
+  // ==========================================================
+
+  const selectedModelObject =
+    models.find(
+      (model) =>
+        getModelKey(model) ===
+        selectedModel
+    );
+
+  const selectedModelDisplayName =
+    getModelDisplayName(
+      selectedModelObject
+    ) ||
+    selectedModel;
+
+  // ==========================================================
+  // RESULT HELPERS
+  // ==========================================================
+
+  function getPredictionValue() {
+    if (
+      prediction === null ||
+      prediction === undefined
+    ) {
+      return null;
+    }
+
+    if (
+      prediction.prediction !==
+        undefined &&
+      prediction.prediction !== null
+    ) {
+      return prediction.prediction;
+    }
+
+    if (
+      prediction.result !==
+        undefined &&
+      prediction.result !== null
+    ) {
+      return prediction.result;
+    }
+
+    if (
+      prediction.value !==
+        undefined &&
+      prediction.value !== null
+    ) {
+      return prediction.value;
+    }
+
+    return prediction;
+  }
+
+  function getConfidence() {
+    if (
+      prediction?.confidence ===
+        undefined ||
+      prediction?.confidence ===
+        null
+    ) {
+      return null;
+    }
+
+    const value =
+      Number(
+        prediction.confidence
+      );
+
+    if (
+      Number.isFinite(value)
+    ) {
+      return value <= 1
+        ? `${(
+            value * 100
+          ).toFixed(2)}%`
+        : `${value.toFixed(2)}%`;
+    }
+
+    return String(
+      prediction.confidence
+    );
+  }
+
+  const predictionValue =
+    getPredictionValue();
+
+  const confidence =
+    getConfidence();
+
+  // ==========================================================
+  // RENDER
+  // ==========================================================
 
   return (
-    <Grid
-      item
-      xs={12}
-      sm={6}
-      lg={3}
-    >
-
-      <Card
-        sx={{
-          borderRadius: 4,
-          boxShadow: "none",
-          border:
-            "1px solid #e5e7eb",
-        }}
-      >
-
-        <CardContent>
-
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent:
-                "space-between",
-              alignItems: "center",
-            }}
-          >
-
-            <Box>
-
-              <Typography
-                variant="body2"
-                color="text.secondary"
-              >
-                {title}
-              </Typography>
-
-              <Typography
-                variant="h5"
-                fontWeight={900}
-                sx={{ mt: 0.5 }}
-              >
-                {value}
-              </Typography>
-
-            </Box>
-
-
-            <Avatar
-              sx={{
-                backgroundColor:
-                  background,
-                color,
-              }}
-            >
-              {icon}
-            </Avatar>
-
-          </Box>
-
-
-          <Box
-            sx={{
-              display: "flex",
-              gap: 1,
-              alignItems: "center",
-              mt: 2,
-            }}
-          >
-
-            <Chip
-              size="small"
-              label={change}
-              sx={{
-                color,
-                backgroundColor:
-                  background,
-                fontWeight: 800,
-              }}
-            />
-
-            <Typography
-              variant="caption"
-              color="text.secondary"
-            >
-              {subtitle}
-            </Typography>
-
-          </Box>
-
-
-          <Box sx={{ mt: 2 }}>
-
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent:
-                  "space-between",
-              }}
-            >
-
-              <Typography
-                variant="caption"
-                color="text.secondary"
-              >
-                AI Confidence
-              </Typography>
-
-              <Typography
-                variant="caption"
-                fontWeight={900}
-              >
-                {confidence}
-              </Typography>
-
-            </Box>
-
-
-            <LinearProgress
-              variant="determinate"
-              value={parseInt(confidence)}
-              sx={{
-                mt: 0.5,
-                height: 6,
-                borderRadius: 5,
-
-                "& .MuiLinearProgress-bar":
-                  {
-                    backgroundColor:
-                      color,
-                    borderRadius: 5,
-                  },
-              }}
-            />
-
-          </Box>
-
-        </CardContent>
-
-      </Card>
-
-    </Grid>
-  );
-}
-
-
-/* =====================================================
-   RISK ROW
-===================================================== */
-
-function RiskRow({
-  animal,
-  risk,
-  level,
-  color,
-}) {
-
-  return (
-    <Box sx={{ mb: 2.5 }}>
-
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent:
-            "space-between",
-          mb: 0.7,
-        }}
-      >
-
-        <Typography
-          variant="body2"
-          fontWeight={800}
-        >
-          {animal}
-        </Typography>
-
-        <Chip
-          size="small"
-          label={`${level} • ${risk}%`}
-          sx={{
-            color,
-            backgroundColor:
-              level === "High"
-                ? "#fee2e2"
-                : level === "Medium"
-                ? "#fef3c7"
-                : "#dcfce7",
-            fontWeight: 800,
-          }}
-        />
-
-      </Box>
-
-
-      <LinearProgress
-        variant="determinate"
-        value={risk}
-        sx={{
-          height: 8,
-          borderRadius: 5,
-          backgroundColor: "#e5e7eb",
-
-          "& .MuiLinearProgress-bar":
-            {
-              backgroundColor: color,
-              borderRadius: 5,
-            },
-        }}
-      />
-
-    </Box>
-  );
-}
-
-
-/* =====================================================
-   TREND ITEM
-===================================================== */
-
-function TrendItem({
-  label,
-  value,
-  color,
-}) {
-
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        justifyContent:
-          "space-between",
-        alignItems: "center",
-        py: 1.5,
-        borderBottom:
-          "1px solid #f1f5f9",
+    <div
+      style={{
+        width: "100%",
+        padding: "24px",
+        boxSizing: "border-box",
       }}
     >
+      {/* ================================================== */}
+      {/* HEADER */}
+      {/* ================================================== */}
 
-      <Typography
-        fontWeight={700}
-      >
-        {label}
-      </Typography>
-
-      <Chip
-        size="small"
-        label={value}
-        sx={{
-          color,
-          backgroundColor:
-            "#f1f5f9",
-          fontWeight: 900,
-        }}
-      />
-
-    </Box>
-  );
-}
-
-
-/* =====================================================
-   ANIMAL PREDICTION
-===================================================== */
-
-function AnimalPrediction({
-  emoji,
-  id,
-  name,
-  prediction,
-  score,
-  result,
-  color,
-}) {
-
-  return (
-    <Grid
-      item
-      xs={12}
-      sm={6}
-      lg={3}
-    >
-
-      <Card
-        sx={{
-          borderRadius: 4,
-          boxShadow: "none",
-          border:
-            "1px solid #e5e7eb",
+      <div
+        style={{
+          marginBottom: "24px",
         }}
       >
+        <h1
+          style={{
+            margin: 0,
+            fontSize: "28px",
+            fontWeight: 700,
+          }}
+        >
+          AI Predictions
+        </h1>
 
-        <CardContent>
+        <p
+          style={{
+            marginTop: "8px",
+            marginBottom: 0,
+            color: "#666",
+          }}
+        >
+          Generate AI-powered
+          production, health,
+          behaviour and activity
+          predictions for your
+          livestock.
+        </p>
+      </div>
 
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1.5,
-              mb: 2,
-            }}
-          >
+      {/* ================================================== */}
+      {/* MODEL GROUPS */}
+      {/* ================================================== */}
 
-            <Avatar
-              sx={{
-                fontSize: 28,
-                backgroundColor:
-                  "#eff6ff",
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(260px, 1fr))",
+          gap: "16px",
+          marginBottom: "28px",
+        }}
+      >
+        {MODEL_GROUPS.map(
+          (group) => (
+            <div
+              key={
+                group.title
+              }
+              style={{
+                border:
+                  "1px solid #e5e5e5",
+                borderRadius:
+                  "12px",
+                padding: "18px",
+                background:
+                  "#fff",
               }}
             >
-              {emoji}
-            </Avatar>
-
-            <Box>
-
-              <Typography
-                fontWeight={900}
+              <h3
+                style={{
+                  marginTop: 0,
+                  marginBottom:
+                    "12px",
+                  fontSize:
+                    "16px",
+                }}
               >
-                {id}
-              </Typography>
+                {group.title}
+              </h3>
 
-              <Typography
-                variant="caption"
-                color="text.secondary"
+              <div
+                style={{
+                  display:
+                    "flex",
+                  flexDirection:
+                    "column",
+                  gap: "7px",
+                }}
               >
-                {name}
-              </Typography>
+                {group.models.map(
+                  (item) => (
+                    <div
+                      key={
+                        item.name
+                      }
+                      style={{
+                        color:
+                          "#555",
+                        fontSize:
+                          "14px",
+                      }}
+                    >
+                      •{" "}
+                      {item.name}
+                    </div>
+                  )
+                )}
+              </div>
+            </div>
+          )
+        )}
+      </div>
 
-            </Box>
+      {/* ================================================== */}
+      {/* ML ENGINE */}
+      {/* ================================================== */}
 
-          </Box>
+      <div
+        style={{
+          marginBottom:
+            "24px",
+          padding:
+            "16px 18px",
+          borderRadius:
+            "10px",
+          background:
+            "#f7f8fa",
+          border:
+            "1px solid #e5e5e5",
+        }}
+      >
+        <strong>
+          ML Prediction Engine
+        </strong>
 
+        <div
+          style={{
+            marginTop: "5px",
+            color: "#666",
+          }}
+        >
+          {loadingModels
+            ? "Loading trained models..."
+            : `${models.length || 0} trained models available`}
+        </div>
+      </div>
 
-          <Typography
-            variant="body2"
-            color="text.secondary"
-          >
-            Prediction
-          </Typography>
+      {/* ================================================== */}
+      {/* PREDICTION FORM */}
+      {/* ================================================== */}
 
+      <form
+        onSubmit={
+          handlePredict
+        }
+        style={{
+          background:
+            "#fff",
+          border:
+            "1px solid #e2e2e2",
+          borderRadius:
+            "14px",
+          padding:
+            "24px",
+          marginBottom:
+            "24px",
+        }}
+      >
+        <h2
+          style={{
+            marginTop: 0,
+            marginBottom:
+              "20px",
+            fontSize:
+              "20px",
+          }}
+        >
+          Run Prediction
+        </h2>
 
-          <Typography
-            fontWeight={900}
-            sx={{
-              color,
-              mt: 0.5,
+        {/* ================================================= */}
+        {/* MODEL SELECT */}
+        {/* ================================================= */}
+
+        <div
+          style={{
+            marginBottom:
+              "22px",
+          }}
+        >
+          <label
+            style={{
+              display:
+                "block",
+              fontWeight: 600,
+              marginBottom:
+                "8px",
             }}
           >
-            {prediction}
-          </Typography>
+            ML Model
+          </label>
 
-
-          <Typography
-            variant="body2"
-            sx={{ mt: 1 }}
+          <select
+            value={
+              selectedModel
+            }
+            onChange={(event) =>
+              setSelectedModel(
+                event.target
+                  .value
+              )
+            }
+            disabled={
+              loadingModels
+            }
+            style={{
+              width: "100%",
+              padding:
+                "12px",
+              border:
+                "1px solid #ccc",
+              borderRadius:
+                "8px",
+              fontSize:
+                "14px",
+              background:
+                "#fff",
+            }}
           >
-            {result}
-          </Typography>
+            <option value="">
+              Select ML Model
+            </option>
 
+            {models.map(
+              (
+                model,
+                index
+              ) => {
+                const key =
+                  getModelKey(
+                    model
+                  );
 
-          <LinearProgress
-            variant="determinate"
-            value={score}
-            sx={{
-              mt: 2,
-              height: 7,
-              borderRadius: 5,
+                const display =
+                  getModelDisplayName(
+                    model
+                  ) || key;
 
-              "& .MuiLinearProgress-bar":
+                return (
+                  <option
+                    key={`${key}-${index}`}
+                    value={key}
+                  >
+                    {display}
+                  </option>
+                );
+              }
+            )}
+          </select>
+        </div>
+
+        {/* ================================================= */}
+        {/* SELECTED MODEL */}
+        {/* ================================================= */}
+
+        {selectedModel && (
+          <div
+            style={{
+              marginBottom:
+                "20px",
+              padding:
+                "14px 16px",
+              background:
+                "#f7f9fc",
+              borderRadius:
+                "8px",
+              border:
+                "1px solid #e4e8ee",
+            }}
+          >
+            <div
+              style={{
+                fontSize:
+                  "12px",
+                color:
+                  "#777",
+                marginBottom:
+                  "4px",
+              }}
+            >
+              SELECTED MODEL
+            </div>
+
+            <strong>
+              {
+                selectedModelDisplayName
+              }
+            </strong>
+          </div>
+        )}
+
+        {/* ================================================= */}
+        {/* FEATURES */}
+        {/* ================================================= */}
+
+        {selectedModel && (
+          <>
+            <div
+              style={{
+                marginBottom:
+                  "14px",
+              }}
+            >
+              <h3
+                style={{
+                  margin:
+                    "0 0 5px 0",
+                  fontSize:
+                    "16px",
+                }}
+              >
+                Prediction Features
+              </h3>
+
+              <p
+                style={{
+                  margin: 0,
+                  color:
+                    "#777",
+                  fontSize:
+                    "13px",
+                }}
+              >
+                Enter 2–3 input
+                features for
+                this model.
+              </p>
+            </div>
+
+            {loadingFeatures ? (
+              <div
+                style={{
+                  padding:
+                    "20px 0",
+                  color:
+                    "#666",
+                }}
+              >
+                Loading model
+                features...
+              </div>
+            ) : modelFeatures.length ===
+              0 ? (
+              <div
+                style={{
+                  padding:
+                    "14px",
+                  borderRadius:
+                    "8px",
+                  background:
+                    "#fff8e6",
+                  border:
+                    "1px solid #f0d48a",
+                  color:
+                    "#725b1c",
+                  marginBottom:
+                    "18px",
+                }}
+              >
+                No features were
+                returned for this
+                model.
+              </div>
+            ) : (
+              <div
+                style={{
+                  display:
+                    "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: "16px",
+                  marginBottom:
+                    "20px",
+                }}
+              >
+                {modelFeatures.map(
+                  (
+                    feature
+                  ) => (
+                    <div
+                      key={
+                        feature
+                      }
+                    >
+                      <label
+                        style={{
+                          display:
+                            "block",
+                          fontWeight:
+                            600,
+                          marginBottom:
+                            "7px",
+                          fontSize:
+                            "14px",
+                        }}
+                      >
+                        {prettifyFeatureName(
+                          feature
+                        )}
+                      </label>
+
+                      <input
+                        type={
+                          isNumericFeature(
+                            feature
+                          )
+                            ? "number"
+                            : "text"
+                        }
+                        step={
+                          isNumericFeature(
+                            feature
+                          )
+                            ? "any"
+                            : undefined
+                        }
+                        value={
+                          featureValues[
+                            feature
+                          ] ??
+                          ""
+                        }
+                        onChange={(
+                          event
+                        ) =>
+                          handleFeatureChange(
+                            feature,
+                            event
+                              .target
+                              .value
+                          )
+                        }
+                        placeholder={`Enter ${prettifyFeatureName(
+                          feature
+                        )}`}
+                        style={{
+                          width:
+                            "100%",
+                          boxSizing:
+                            "border-box",
+                          padding:
+                            "11px 12px",
+                          border:
+                            "1px solid #ccc",
+                          borderRadius:
+                            "8px",
+                          fontSize:
+                            "14px",
+                        }}
+                      />
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+
+            {/* ============================================ */}
+            {/* FEATURE COUNT */}
+            {/* ============================================ */}
+
+            {modelFeatures.length >
+              0 && (
+              <div
+                style={{
+                  marginBottom:
+                    "18px",
+                  color:
+                    validFeatureCount >=
+                    2
+                      ? "#27744b"
+                      : "#777",
+                  fontSize:
+                    "13px",
+                }}
+              >
+                {validFeatureCount}
+                {" "}
+                of{" "}
+                {modelFeatures.length}
+                {" "}
+                features entered
+              </div>
+            )}
+
+            {/* ============================================ */}
+            {/* PREDICT BUTTON */}
+            {/* ============================================ */}
+
+            <button
+              type="submit"
+              disabled={
+                predicting ||
+                loadingFeatures ||
+                !selectedModel ||
+                validFeatureCount < 2
+              }
+              style={{
+                width: "100%",
+                padding:
+                  "13px 18px",
+                border: "none",
+                borderRadius:
+                  "8px",
+                background:
+                  predicting
+                    ? "#999"
+                    : "#1f6f4a",
+                color: "#fff",
+                fontSize:
+                  "15px",
+                fontWeight:
+                  600,
+                cursor:
+                  predicting ||
+                  validFeatureCount <
+                    2
+                    ? "not-allowed"
+                    : "pointer",
+              }}
+            >
+              {predicting
+                ? "Running Prediction..."
+                : "Run Prediction"}
+            </button>
+          </>
+        )}
+      </form>
+
+      {/* ================================================== */}
+      {/* ERROR */}
+      {/* ================================================== */}
+
+      {error && (
+        <div
+          style={{
+            marginBottom:
+              "18px",
+            padding:
+              "13px 16px",
+            borderRadius:
+              "8px",
+            background:
+              "#fff0f0",
+            border:
+              "1px solid #efb5b5",
+            color:
+              "#a22",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* ================================================== */}
+      {/* SUCCESS */}
+      {/* ================================================== */}
+
+      {success && (
+        <div
+          style={{
+            marginBottom:
+              "18px",
+            padding:
+              "13px 16px",
+            borderRadius:
+              "8px",
+            background:
+              "#eefaf3",
+            border:
+              "1px solid #b9dfc8",
+            color:
+              "#236b42",
+          }}
+        >
+          {success}
+        </div>
+      )}
+
+      {/* ================================================== */}
+      {/* RESULT */}
+      {/* ================================================== */}
+
+      {prediction && (
+        <div
+          style={{
+            background:
+              "#fff",
+            border:
+              "1px solid #e2e2e2",
+            borderRadius:
+              "14px",
+            padding:
+              "24px",
+          }}
+        >
+          <h2
+            style={{
+              marginTop: 0,
+              marginBottom:
+                "22px",
+              fontSize:
+                "20px",
+            }}
+          >
+            Prediction Result
+          </h2>
+
+          <div
+            style={{
+              display:
+                "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: "14px",
+            }}
+          >
+            {/* ========================================== */}
+            {/* PREDICTION TYPE */}
+            {/* ========================================== */}
+
+            <div
+              style={{
+                padding:
+                  "16px",
+                background:
+                  "#f7f8fa",
+                borderRadius:
+                  "9px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize:
+                    "11px",
+                  color:
+                    "#777",
+                  marginBottom:
+                    "6px",
+                }}
+              >
+                MODEL
+              </div>
+
+              <strong>
                 {
-                  backgroundColor: color,
-                },
+                  selectedModelDisplayName
+                }
+              </strong>
+            </div>
+
+            {/* ========================================== */}
+            {/* PREDICTION */}
+            {/* ========================================== */}
+
+            <div
+              style={{
+                padding:
+                  "16px",
+                background:
+                  "#f7f8fa",
+                borderRadius:
+                  "9px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize:
+                    "11px",
+                  color:
+                    "#777",
+                  marginBottom:
+                    "6px",
+                }}
+              >
+                PREDICTION
+              </div>
+
+              <strong
+                style={{
+                  fontSize:
+                    "20px",
+                }}
+              >
+                {typeof predictionValue ===
+                "object"
+                  ? JSON.stringify(
+                      predictionValue
+                    )
+                  : String(
+                      predictionValue
+                    )}
+              </strong>
+            </div>
+
+            {/* ========================================== */}
+            {/* CONFIDENCE */}
+            {/* ========================================== */}
+
+            {confidence && (
+              <div
+                style={{
+                  padding:
+                    "16px",
+                  background:
+                    "#f7f8fa",
+                  borderRadius:
+                    "9px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize:
+                      "11px",
+                    color:
+                      "#777",
+                    marginBottom:
+                      "6px",
+                  }}
+                >
+                  CONFIDENCE
+                </div>
+
+                <strong
+                  style={{
+                    fontSize:
+                      "20px",
+                  }}
+                >
+                  {confidence}
+                </strong>
+              </div>
+            )}
+
+            {/* ========================================== */}
+            {/* STATUS */}
+            {/* ========================================== */}
+
+            <div
+              style={{
+                padding:
+                  "16px",
+                background:
+                  "#f7f8fa",
+                borderRadius:
+                  "9px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize:
+                    "11px",
+                  color:
+                    "#777",
+                  marginBottom:
+                    "6px",
+                }}
+              >
+                STATUS
+              </div>
+
+              <strong>
+                {prediction.status ||
+                  "success"}
+              </strong>
+            </div>
+          </div>
+
+          {/* ============================================ */}
+          {/* FEATURES USED */}
+          {/* ============================================ */}
+
+          {prediction.features_used &&
+            Array.isArray(
+              prediction.features_used
+            ) &&
+            prediction
+              .features_used
+              .length > 0 && (
+              <div
+                style={{
+                  marginTop:
+                    "20px",
+                  padding:
+                    "16px",
+                  background:
+                    "#f7f8fa",
+                  borderRadius:
+                    "9px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize:
+                      "11px",
+                    color:
+                      "#777",
+                    marginBottom:
+                      "8px",
+                  }}
+                >
+                  FEATURES USED
+                </div>
+
+                <div
+                  style={{
+                    display:
+                      "flex",
+                    flexWrap:
+                      "wrap",
+                    gap: "8px",
+                  }}
+                >
+                  {prediction.features_used.map(
+                    (
+                      feature,
+                      index
+                    ) => (
+                      <span
+                        key={`${feature}-${index}`}
+                        style={{
+                          padding:
+                            "6px 10px",
+                          borderRadius:
+                            "20px",
+                          background:
+                            "#e8f3ed",
+                          color:
+                            "#276b47",
+                          fontSize:
+                            "12px",
+                        }}
+                      >
+                        {
+                          prettifyFeatureName(
+                            feature
+                          )
+                        }
+                      </span>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+
+          {/* ============================================ */}
+          {/* INPUT VALUES */}
+          {/* ============================================ */}
+
+          <div
+            style={{
+              marginTop:
+                "20px",
+              padding:
+                "16px",
+              background:
+                "#f7f8fa",
+              borderRadius:
+                "9px",
             }}
-          />
-
-
-          <Typography
-            variant="caption"
-            color="text.secondary"
           >
-            Prediction confidence:{" "}
-            {score}%
-          </Typography>
+            <div
+              style={{
+                fontSize:
+                  "11px",
+                color:
+                  "#777",
+                marginBottom:
+                  "10px",
+              }}
+            >
+              INPUT FEATURES
+            </div>
 
-        </CardContent>
+            <div
+              style={{
+                display:
+                  "flex",
+                flexDirection:
+                  "column",
+                gap: "7px",
+              }}
+            >
+              {Object.entries(
+                featureValues
+              )
+                .filter(
+                  ([
+                    ,
+                    value,
+                  ]) =>
+                    value !==
+                      undefined &&
+                    value !==
+                      null &&
+                    String(
+                      value
+                    ).trim() !== ""
+                )
+                .map(
+                  ([
+                    feature,
+                    value,
+                  ]) => (
+                    <div
+                      key={
+                        feature
+                      }
+                      style={{
+                        display:
+                          "flex",
+                        justifyContent:
+                          "space-between",
+                        gap: "15px",
+                        fontSize:
+                          "13px",
+                      }}
+                    >
+                      <span>
+                        {prettifyFeatureName(
+                          feature
+                        )}
+                      </span>
 
-      </Card>
-
-    </Grid>
+                      <strong>
+                        {String(
+                          value
+                        )}
+                      </strong>
+                    </div>
+                  )
+                )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
-
-/* =====================================================
-   RECOMMENDATION
-===================================================== */
-
-function Recommendation({
-  icon,
-  title,
-  text,
-}) {
-
-  return (
-    <Box
-      sx={{
-        p: 2,
-        height: "100%",
-        borderRadius: 3,
-        backgroundColor:
-          "rgba(255,255,255,0.1)",
-      }}
-    >
-
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-          mb: 1,
-        }}
-      >
-
-        {icon}
-
-        <Typography
-          fontWeight={900}
-        >
-          {title}
-        </Typography>
-
-      </Box>
-
-
-      <Typography
-        variant="body2"
-        sx={{ opacity: 0.8 }}
-      >
-        {text}
-      </Typography>
-
-    </Box>
-  );
-}

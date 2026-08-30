@@ -1,227 +1,141 @@
-// =====================================================
-// AGROLENS PLF - CENTRAL API HELPER
-// =====================================================
 
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+// ============================================================
+// src/api/axios.js
+// Apollo AgriVerse - PashuSense
+// Authenticated API client
+// ============================================================
 
-// =====================================================
-// GENERIC API REQUEST
-// =====================================================
+import axios from "axios";
 
-async function apiRequest(endpoint, options = {}) {
-  const token =
-    localStorage.getItem("access_token") ||
-    localStorage.getItem("token") ||
-    localStorage.getItem("authToken") ||
-    "";
+const API_BASE_URL =
+  "http://127.0.0.1:8000";
 
-  const headers = {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-    ...(options.headers || {}),
-  };
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30000,
+});
 
-  // ===================================================
-  // JWT AUTHENTICATION
-  // ===================================================
+// ============================================================
+// REQUEST INTERCEPTOR
+// ============================================================
 
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  // Make sure endpoint starts with /
-  const cleanEndpoint = endpoint.startsWith("/")
-    ? endpoint
-    : `/${endpoint}`;
-
-  const url = `${API_BASE_URL}${cleanEndpoint}`;
-
-  console.log("=================================");
-  console.log("API REQUEST");
-  console.log("URL:", url);
-  console.log("METHOD:", options.method || "GET");
-  console.log("=================================");
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    // ===================================================
-    // READ RESPONSE
-    // ===================================================
-
-    let data = null;
-
-    try {
-      data = await response.json();
-    } catch {
-      data = null;
-    }
-
-    console.log("=================================");
-    console.log("API RESPONSE");
-    console.log("STATUS:", response.status);
-    console.log("DATA:", data);
-    console.log("=================================");
-
-    // ===================================================
-    // UNAUTHORIZED
-    // ===================================================
-
-    if (response.status === 401) {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("token");
-      localStorage.removeItem("authToken");
-      localStorage.removeItem("isLoggedIn");
-      localStorage.removeItem("userEmail");
-      localStorage.removeItem("user");
-
-      window.location.href = "/login";
-
-      throw new Error(
-        "Your session has expired. Please login again."
+api.interceptors.request.use(
+  (config) => {
+    const token =
+      localStorage.getItem(
+        "access_token"
+      ) ||
+      localStorage.getItem(
+        "token"
       );
+
+    console.log(
+      "================================="
+    );
+
+    console.log(
+      "API REQUEST"
+    );
+
+    console.log(
+      "URL:",
+      `${API_BASE_URL}${config.url}`
+    );
+
+    console.log(
+      "METHOD:",
+      config.method?.toUpperCase()
+    );
+
+    console.log(
+      "TOKEN EXISTS:",
+      Boolean(token)
+    );
+
+    console.log(
+      "================================="
+    );
+
+    if (token) {
+      config.headers =
+        config.headers || {};
+
+      config.headers.Authorization =
+        `Bearer ${token}`;
     }
 
-    // ===================================================
-    // API ERROR
-    // ===================================================
+    return config;
+  },
 
-    if (!response.ok) {
-      const message =
-        data?.detail ||
-        data?.message ||
-        `API request failed: ${response.status}`;
-
-      throw new Error(
-        typeof message === "string"
-          ? message
-          : JSON.stringify(message)
-      );
-    }
-
-    // ===================================================
-    // IMPORTANT
-    //
-    // Return Axios-style object because your existing
-    // animals.js, farms.js, milk.js, etc. use:
-    //
-    // const response = await api.get(...)
-    // return response.data
-    // ===================================================
-
-    return {
-      data,
-      status: response.status,
-      ok: response.ok,
-    };
-  } catch (error) {
-    console.error("API ERROR:", error);
-    throw error;
+  (error) => {
+    return Promise.reject(
+      error
+    );
   }
-}
+);
 
-// =====================================================
-// GET
-// =====================================================
+// ============================================================
+// RESPONSE INTERCEPTOR
+// ============================================================
 
-export function get(endpoint) {
-  return apiRequest(endpoint, {
-    method: "GET",
-  });
-}
+api.interceptors.response.use(
+  (response) => {
+    console.log(
+      "================================="
+    );
 
-// =====================================================
-// POST
-// =====================================================
+    console.log(
+      "API RESPONSE"
+    );
 
-export function post(endpoint, body) {
-  return apiRequest(endpoint, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
+    console.log(
+      "STATUS:",
+      response.status
+    );
 
-// =====================================================
-// PUT
-// =====================================================
+    console.log(
+      "DATA:",
+      response.data
+    );
 
-export function put(endpoint, body) {
-  return apiRequest(endpoint, {
-    method: "PUT",
-    body: JSON.stringify(body),
-  });
-}
+    console.log(
+      "================================="
+    );
 
-// =====================================================
-// PATCH
-// =====================================================
+    return response;
+  },
 
-export function patch(endpoint, body) {
-  return apiRequest(endpoint, {
-    method: "PATCH",
-    body: JSON.stringify(body),
-  });
-}
+  (error) => {
+    console.error(
+      "API ERROR:",
+      error.response?.status
+    );
 
-// =====================================================
-// DELETE
-// =====================================================
+    console.error(
+      "API DATA:",
+      error.response?.data
+    );
 
-export function del(endpoint) {
-  return apiRequest(endpoint, {
-    method: "DELETE",
-  });
-}
+    if (
+      error.response?.status ===
+      401
+    ) {
+      console.error(
+        "Authentication failed."
+      );
 
-// =====================================================
-// REPORTS & ANALYTICS
-// =====================================================
-//
-// IMPORTANT:
-// API_BASE_URL already contains /api
-//
-// Therefore use:
-// /reports/overview
-//
-// NOT:
-// /api/reports/overview
-// =====================================================
+      /*
+       * Do not redirect automatically here.
+       * This prevents unwanted redirects during
+       * page loading.
+       */
+    }
 
-export async function getReportOverview(farmId = 7) {
-  return get(
-    `/reports/overview?farm_id=${farmId}`
-  );
-}
-
-export async function getHealthSummary(farmId = 7) {
-  return get(
-    `/reports/health-summary?farm_id=${farmId}`
-  );
-}
-
-export async function getProductionSummary(farmId = 7) {
-  return get(
-    `/reports/production?farm_id=${farmId}`
-  );
-}
-
-// =====================================================
-// DEFAULT API OBJECT
-// =====================================================
-
-const api = {
-  get,
-  post,
-  put,
-  patch,
-  delete: del,
-
-  getReportOverview,
-  getHealthSummary,
-  getProductionSummary,
-};
+    return Promise.reject(
+      error
+    );
+  }
+);
 
 export default api;
+

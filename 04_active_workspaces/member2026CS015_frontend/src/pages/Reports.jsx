@@ -1,5 +1,5 @@
+
 import { useEffect, useState } from "react";
-import BackToHome from "../components/BackToHome";
 import {
   Box,
   Typography,
@@ -32,10 +32,9 @@ import {
   getProductionSummary,
 } from "../api/api";
 
-
-// =====================================================
+// ============================================================
 // REPORTS PAGE
-// =====================================================
+// ============================================================
 
 export default function Reports() {
   const [period, setPeriod] = useState("This Month");
@@ -48,58 +47,77 @@ export default function Reports() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Current farm
   const FARM_ID = 7;
 
-
-  // =====================================================
-  // LOAD REPORT DATA
-  // =====================================================
+  // ==========================================================
+  // LOAD REPORTS
+  // ==========================================================
 
   useEffect(() => {
-    const loadReports = async () => {
+    let mounted = true;
+
+    async function loadReports() {
       try {
         setLoading(true);
         setError("");
 
-        const [
-          overviewData,
-          healthData,
-          productionData,
-        ] = await Promise.all([
+        const results = await Promise.allSettled([
           getReportOverview(FARM_ID),
           getHealthSummary(FARM_ID),
           getProductionSummary(FARM_ID),
         ]);
 
-        console.log("Reports Overview:", overviewData);
-        console.log("Health Summary:", healthData);
-        console.log("Production Summary:", productionData);
+        if (!mounted) return;
 
-        setOverview(overviewData);
-        setHealthSummary(healthData);
-        setProductionSummary(productionData);
+        const [overviewResult, healthResult, productionResult] =
+          results;
+
+        if (overviewResult.status === "fulfilled") {
+          setOverview(overviewResult.value);
+        }
+
+        if (healthResult.status === "fulfilled") {
+          setHealthSummary(healthResult.value);
+        }
+
+        if (productionResult.status === "fulfilled") {
+          setProductionSummary(productionResult.value);
+        }
+
+        const failed = results.some(
+          (result) => result.status === "rejected"
+        );
+
+        if (failed) {
+          setError(
+            "Some report data could not be loaded. Showing available farm information."
+          );
+        }
       } catch (err) {
-        console.error("Reports API Error:", err);
+        console.error("Reports Error:", err);
 
-        const message =
-          err?.response?.data?.detail ||
-          err?.message ||
-          "Failed to load report data.";
-
-        setError(message);
+        if (mounted) {
+          setError(
+            "Report data could not be loaded. Showing available farm information."
+          );
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
-    };
+    }
 
     loadReports();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-
-  // =====================================================
+  // ==========================================================
   // LOADING
-  // =====================================================
+  // ==========================================================
 
   if (loading) {
     return (
@@ -128,233 +146,288 @@ export default function Reports() {
     );
   }
 
-
-  // =====================================================
-  // ERROR
-  // =====================================================
-
-  if (error) {
-    return (
-      <Box
-        sx={{
-          minHeight: "100vh",
-          backgroundColor: "#f7f9fc",
-          p: {
-            xs: 2,
-            sm: 3,
-            md: 4,
-          },
-        }}
-      >
-        <Alert severity="error">
-          {error}
-        </Alert>
-      </Box>
-    );
-  }
-
-
-  // =====================================================
+  // ==========================================================
   // SAFE DATA
-  // =====================================================
+  // ==========================================================
 
   const totalAnimals =
-    overview?.total_animals ?? 0;
+    Number(overview?.total_animals ?? 0);
 
-
-  const milkLitres =
+  const milkLitres = Number(
     overview?.milk_production?.litres ??
-    productionSummary?.milk_litres ??
-    0;
+      productionSummary?.milk_litres ??
+      0
+  );
 
+  const milkPrevious = Number(
+    overview?.milk_production?.previous_month_litres ?? 0
+  );
 
-  const milkPrevious =
-    overview?.milk_production?.previous_month_litres ??
-    0;
-
-
-  const milkChange =
-    overview?.milk_production?.change_percent ??
-    0;
-
-
-  const eggCount =
+  const eggCount = Number(
     overview?.egg_production?.count ??
-    productionSummary?.eggs ??
-    0;
+      productionSummary?.eggs ??
+      0
+  );
 
+  const eggPrevious = Number(
+    overview?.egg_production?.previous_month_count ?? 0
+  );
 
-  const eggPrevious =
-    overview?.egg_production?.previous_month_count ??
-    0;
-
-
-  const eggChange =
-    overview?.egg_production?.change_percent ??
-    0;
-
-
-  const woolKg =
+  const woolKg = Number(
     overview?.wool_production?.kg ??
-    productionSummary?.wool_kg ??
-    0;
+      productionSummary?.wool_kg ??
+      0
+  );
 
+  const woolPrevious = Number(
+    overview?.wool_production?.previous_month_kg ?? 0
+  );
 
-  const woolPrevious =
-    overview?.wool_production?.previous_month_kg ??
-    0;
-
-
-  const woolChange =
-    overview?.wool_production?.change_percent ??
-    0;
-
-
-  const healthy =
+  const healthy = Number(
     healthSummary?.healthy ??
-    overview?.animal_health?.healthy ??
-    0;
+      overview?.animal_health?.healthy ??
+      0
+  );
 
-
-  const underObservation =
+  const underObservation = Number(
     healthSummary?.under_observation ??
-    overview?.animal_health?.under_observation ??
-    0;
+      overview?.animal_health?.under_observation ??
+      0
+  );
 
-
-  const critical =
+  const critical = Number(
     healthSummary?.critical ??
-    overview?.animal_health?.critical ??
-    0;
+      overview?.animal_health?.critical ??
+      0
+  );
 
-
-  const healthPercentage =
+  const healthPercentage = Number(
     overview?.animal_health?.health_percentage ??
-    healthSummary?.health_percentage ??
-    0;
+      healthSummary?.health_percentage ??
+      (totalAnimals > 0
+        ? (healthy / totalAnimals) * 100
+        : 0)
+  );
 
-
-  const performance =
-    overview?.performance ?? {};
-
+  const performance = overview?.performance ?? {};
 
   const targets =
-    overview?.targets ?? {};
+    overview?.targets ??
+    productionSummary?.targets ??
+    {};
 
+  const milkTarget = Number(
+    targets?.milk_litres ?? 1450
+  );
 
-  const milkTarget =
-    targets?.milk_litres ?? 0;
+  const eggTarget = Number(
+    targets?.eggs ?? 9000
+  );
 
+  const woolTarget = Number(
+    targets?.wool_kg ?? 125
+  );
 
-  const eggTarget =
-    targets?.eggs ?? 0;
+  // ==========================================================
+  // CHANGE DISPLAY
+  // ==========================================================
 
+  const milkChange =
+    overview?.milk_production?.change_percent;
 
-  const woolTarget =
-    targets?.wool_kg ?? 0;
+  const eggChange =
+    overview?.egg_production?.change_percent;
 
+  const woolChange =
+    overview?.wool_production?.change_percent;
 
-  // =====================================================
+  function getChangeText(current, previous, change) {
+    if (
+      previous === 0 &&
+      current > 0
+    ) {
+      return "No previous-month data";
+    }
+
+    if (
+      previous === 0 &&
+      current === 0
+    ) {
+      return "No previous-month data";
+    }
+
+    const value = Number(change ?? 0);
+
+    if (value > 0) {
+      return `↑ ${value}% vs last month`;
+    }
+
+    if (value < 0) {
+      return `↓ ${Math.abs(value)}% vs last month`;
+    }
+
+    return "No change vs last month";
+  }
+
+  const milkChangeText = getChangeText(
+    milkLitres,
+    milkPrevious,
+    milkChange
+  );
+
+  const eggChangeText = getChangeText(
+    eggCount,
+    eggPrevious,
+    eggChange
+  );
+
+  const woolChangeText = getChangeText(
+    woolKg,
+    woolPrevious,
+    woolChange
+  );
+
+  // ==========================================================
   // PRODUCTION PERCENTAGES
-  // =====================================================
+  // ==========================================================
 
   const milkPercentage =
     milkTarget > 0
       ? Math.min(
           100,
-          Math.round(
-            (Number(milkLitres) / Number(milkTarget)) * 100
+          Number(
+            (
+              (milkLitres / milkTarget) *
+              100
+            ).toFixed(1)
           )
         )
       : 0;
-
 
   const eggPercentage =
     eggTarget > 0
       ? Math.min(
           100,
-          Math.round(
-            (Number(eggCount) / Number(eggTarget)) * 100
+          Number(
+            (
+              (eggCount / eggTarget) *
+              100
+            ).toFixed(1)
           )
         )
       : 0;
-
 
   const woolPercentage =
     woolTarget > 0
       ? Math.min(
           100,
-          Math.round(
-            (Number(woolKg) / Number(woolTarget)) * 100
+          Number(
+            (
+              (woolKg / woolTarget) *
+              100
+            ).toFixed(1)
           )
         )
       : 0;
 
+  // ==========================================================
+  // PERFORMANCE
+  // ==========================================================
 
-  // =====================================================
+  const animalHealthPerformance = Number(
+    performance?.animal_health ??
+      healthPercentage ??
+      0
+  );
+
+  const milkPerformance = Number(
+    performance?.milk_production ??
+      milkPercentage ??
+      0
+  );
+
+  const eggPerformance = Number(
+    performance?.egg_production ??
+      eggPercentage ??
+      0
+  );
+
+  const woolPerformance = Number(
+    performance?.wool_production ??
+      woolPercentage ??
+      0
+  );
+
+  const feedEfficiency = Number(
+    performance?.feed_efficiency ?? 0
+  );
+
+  // ==========================================================
   // DOWNLOAD REPORT
-  // =====================================================
+  // ==========================================================
 
-  const handleDownload = () => {
+  function handleDownload() {
     const reportText = `
-AgroLens PLF - Farm Overview Report
-====================================
+Apollo Agriverse - PashuSense
+Precision Livestock Farming
+========================================
 
 Farm ID: ${FARM_ID}
 Period: ${overview?.period || period}
 Report Type: ${reportType}
 
 TOTAL ANIMALS
--------------
+----------------------------------------
 Total Animals: ${totalAnimals}
 Healthy: ${healthy}
 Under Observation: ${underObservation}
 Critical: ${critical}
 
 PRODUCTION
-----------
-Milk Production: ${milkLitres} L
-Milk Previous Month: ${milkPrevious} L
-Milk Change: ${milkChange}%
+----------------------------------------
+Milk Production: ${milkLitres.toFixed(2)} L
+Milk Previous Month: ${
+      milkPrevious.toFixed(2)
+    } L
+Milk Change: ${
+      milkPrevious > 0
+        ? `${milkChange ?? 0}%`
+        : "No previous-month data"
+    }
 
 Egg Production: ${eggCount}
 Egg Previous Month: ${eggPrevious}
-Egg Change: ${eggChange}%
+Egg Change: ${
+      eggPrevious > 0
+        ? `${eggChange ?? 0}%`
+        : "No previous-month data"
+    }
 
-Wool Production: ${woolKg} kg
-Wool Previous Month: ${woolPrevious} kg
-Wool Change: ${woolChange}%
+Wool Production: ${woolKg.toFixed(2)} kg
+Wool Previous Month: ${
+      woolPrevious.toFixed(2)
+    } kg
+Wool Change: ${
+      woolPrevious > 0
+        ? `${woolChange ?? 0}%`
+        : "No previous-month data"
+    }
 
 TARGETS
--------
+----------------------------------------
 Milk Target: ${milkTarget} L
 Egg Target: ${eggTarget}
 Wool Target: ${woolTarget} kg
 
 PERFORMANCE
------------
-Animal Health: ${
-      performance.animal_health ??
-      healthPercentage
-    }%
+----------------------------------------
+Animal Health: ${animalHealthPerformance.toFixed(1)}%
+Milk Production: ${milkPerformance.toFixed(1)}%
+Egg Production: ${eggPerformance.toFixed(1)}%
+Wool Production: ${woolPerformance.toFixed(1)}%
+Feed Efficiency: ${feedEfficiency.toFixed(1)}%
 
-Milk Production: ${
-      performance.milk_production ?? 0
-    }%
-
-Egg Production: ${
-      performance.egg_production ?? 0
-    }%
-
-Wool Production: ${
-      performance.wool_production ?? 0
-    }%
-
-Feed Efficiency: ${
-      performance.feed_efficiency ?? 0
-    }%
-
-Generated by AgroLens PLF
+Generated by Apollo Agriverse - PashuSense
 `;
 
     const blob = new Blob(
@@ -364,26 +437,26 @@ Generated by AgroLens PLF
       }
     );
 
-    const url = URL.createObjectURL(blob);
+    const url =
+      URL.createObjectURL(blob);
 
-    const link = document.createElement("a");
+    const link =
+      document.createElement("a");
 
     link.href = url;
-    link.download = "AgroLens-Farm-Report.txt";
+    link.download =
+      "Apollo-Agriverse-PashuSense-Report.txt";
 
     document.body.appendChild(link);
-
     link.click();
-
     document.body.removeChild(link);
 
     URL.revokeObjectURL(url);
-  };
+  }
 
-
-  // =====================================================
-  // RETURN
-  // =====================================================
+  // ==========================================================
+  // RENDER
+  // ==========================================================
 
   return (
     <Box
@@ -397,10 +470,7 @@ Generated by AgroLens PLF
         },
       }}
     >
-
-      {/* =====================================================
-          HEADER
-      ===================================================== */}
+      {/* HEADER */}
 
       <Box
         sx={{
@@ -433,7 +503,6 @@ Generated by AgroLens PLF
           </Typography>
         </Box>
 
-
         <Button
           variant="contained"
           startIcon={<Download />}
@@ -453,10 +522,21 @@ Generated by AgroLens PLF
         </Button>
       </Box>
 
+      {/* ERROR / PARTIAL DATA */}
 
-      {/* =====================================================
-          FILTERS
-      ===================================================== */}
+      {error && (
+        <Alert
+          severity="warning"
+          sx={{
+            mb: 3,
+            borderRadius: 3,
+          }}
+        >
+          {error}
+        </Alert>
+      )}
+
+      {/* FILTERS */}
 
       <Card
         sx={{
@@ -478,9 +558,6 @@ Generated by AgroLens PLF
               alignItems: "center",
             }}
           >
-
-            {/* REPORT TYPE */}
-
             <TextField
               select
               fullWidth
@@ -515,9 +592,6 @@ Generated by AgroLens PLF
               </MenuItem>
             </TextField>
 
-
-            {/* PERIOD */}
-
             <TextField
               select
               fullWidth
@@ -548,9 +622,6 @@ Generated by AgroLens PLF
               </MenuItem>
             </TextField>
 
-
-            {/* REPORT PERIOD */}
-
             <Box>
               <Chip
                 icon={<CalendarMonth />}
@@ -563,15 +634,11 @@ Generated by AgroLens PLF
                 }}
               />
             </Box>
-
           </Box>
         </CardContent>
       </Card>
 
-
-      {/* =====================================================
-          KPI CARDS
-      ===================================================== */}
+      {/* KPI CARDS */}
 
       <Box
         sx={{
@@ -585,7 +652,6 @@ Generated by AgroLens PLF
           mb: 4,
         }}
       >
-
         <KpiCard
           title="Total Animals"
           value={totalAnimals}
@@ -595,42 +661,35 @@ Generated by AgroLens PLF
           color="#2563eb"
         />
 
-
         <KpiCard
           title="Milk Production"
-          value={`${milkLitres} L`}
-          subtitle={`${milkChange}% vs last month`}
+          value={`${milkLitres.toFixed(1)} L`}
+          subtitle={milkChangeText}
           icon={<LocalDrink />}
           background="#dcfce7"
           color="#15803d"
         />
 
-
         <KpiCard
           title="Egg Production"
           value={eggCount}
-          subtitle={`${eggChange}% vs last month`}
+          subtitle={eggChangeText}
           icon={<Egg />}
           background="#fef3c7"
           color="#d97706"
         />
 
-
         <KpiCard
           title="Wool Production"
-          value={`${woolKg} kg`}
-          subtitle={`${woolChange}% vs last month`}
+          value={`${woolKg.toFixed(1)} kg`}
+          subtitle={woolChangeText}
           icon={<ContentCut />}
           background="#ede9fe"
           color="#7c3aed"
         />
-
       </Box>
 
-
-      {/* =====================================================
-          FARM PERFORMANCE + HEALTH
-      ===================================================== */}
+      {/* PERFORMANCE + HEALTH */}
 
       <Box
         sx={{
@@ -642,19 +701,16 @@ Generated by AgroLens PLF
           gap: 2.5,
         }}
       >
-
-        {/* FARM PERFORMANCE */}
+        {/* PERFORMANCE */}
 
         <Card
           sx={{
             borderRadius: 4,
             boxShadow: "none",
             border: "1px solid #e5e7eb",
-            height: "100%",
           }}
         >
           <CardContent>
-
             <Box
               sx={{
                 display: "flex",
@@ -678,68 +734,48 @@ Generated by AgroLens PLF
               </Typography>
             </Box>
 
-
             <PerformanceRow
               label="Animal Health"
-              value={
-                performance.animal_health ??
-                healthPercentage
-              }
+              value={animalHealthPerformance}
               color="#16a34a"
             />
 
-
             <PerformanceRow
               label="Milk Production"
-              value={
-                performance.milk_production ?? 0
-              }
+              value={milkPerformance}
               color="#2563eb"
             />
 
-
             <PerformanceRow
               label="Egg Production"
-              value={
-                performance.egg_production ?? 0
-              }
+              value={eggPerformance}
               color="#d97706"
             />
 
-
             <PerformanceRow
               label="Wool Production"
-              value={
-                performance.wool_production ?? 0
-              }
+              value={woolPerformance}
               color="#7c3aed"
             />
 
-
             <PerformanceRow
               label="Feed Efficiency"
-              value={
-                performance.feed_efficiency ?? 0
-              }
+              value={feedEfficiency}
               color="#0891b2"
             />
-
           </CardContent>
         </Card>
 
-
-        {/* FARM HEALTH */}
+        {/* HEALTH */}
 
         <Card
           sx={{
             borderRadius: 4,
             boxShadow: "none",
             border: "1px solid #e5e7eb",
-            height: "100%",
           }}
         >
           <CardContent>
-
             <Typography
               variant="h6"
               fontWeight={900}
@@ -748,66 +784,48 @@ Generated by AgroLens PLF
               Animal Health Summary
             </Typography>
 
-
             <HealthRow
               label="Healthy"
               value={healthy}
               percentage={
                 totalAnimals > 0
-                  ? Math.round(
-                      (Number(healthy) /
-                        Number(totalAnimals)) *
-                        100
-                    )
+                  ? (healthy / totalAnimals) * 100
                   : 0
               }
               color="#16a34a"
               icon={<CheckCircle />}
             />
 
-
             <HealthRow
               label="Under Observation"
               value={underObservation}
               percentage={
                 totalAnimals > 0
-                  ? Math.round(
-                      (Number(underObservation) /
-                        Number(totalAnimals)) *
-                        100
-                    )
+                  ? (underObservation /
+                      totalAnimals) *
+                    100
                   : 0
               }
               color="#d97706"
               icon={<Warning />}
             />
 
-
             <HealthRow
               label="Critical"
               value={critical}
               percentage={
                 totalAnimals > 0
-                  ? Math.round(
-                      (Number(critical) /
-                        Number(totalAnimals)) *
-                        100
-                    )
+                  ? (critical / totalAnimals) * 100
                   : 0
               }
               color="#dc2626"
               icon={<Warning />}
             />
-
           </CardContent>
         </Card>
-
       </Box>
 
-
-      {/* =====================================================
-          PRODUCTION SUMMARY
-      ===================================================== */}
+      {/* PRODUCTION SUMMARY */}
 
       <Card
         sx={{
@@ -818,7 +836,6 @@ Generated by AgroLens PLF
         }}
       >
         <CardContent>
-
           <Typography
             variant="h6"
             fontWeight={900}
@@ -826,7 +843,6 @@ Generated by AgroLens PLF
           >
             Production Summary
           </Typography>
-
 
           <Box
             sx={{
@@ -838,10 +854,9 @@ Generated by AgroLens PLF
               gap: 2,
             }}
           >
-
             <ProductionCard
               title="Milk"
-              value={`${milkLitres} L`}
+              value={`${milkLitres.toFixed(1)} L`}
               target={`${milkTarget} L`}
               percentage={milkPercentage}
               icon={<LocalDrink />}
@@ -849,37 +864,30 @@ Generated by AgroLens PLF
               background="#dbeafe"
             />
 
-
             <ProductionCard
               title="Eggs"
               value={eggCount}
-              target={eggTarget}
+              target={`${eggTarget}`}
               percentage={eggPercentage}
               icon={<Egg />}
               color="#d97706"
               background="#fef3c7"
             />
 
-
             <ProductionCard
               title="Wool"
-              value={`${woolKg} kg`}
+              value={`${woolKg.toFixed(1)} kg`}
               target={`${woolTarget} kg`}
               percentage={woolPercentage}
               icon={<ContentCut />}
               color="#7c3aed"
               background="#ede9fe"
             />
-
           </Box>
-
         </CardContent>
       </Card>
 
-
-      {/* =====================================================
-          AI INSIGHTS
-      ===================================================== */}
+      {/* AI INSIGHTS */}
 
       <Card
         sx={{
@@ -891,14 +899,12 @@ Generated by AgroLens PLF
         }}
       >
         <CardContent sx={{ p: 3 }}>
-
           <Typography
             variant="h6"
             fontWeight={900}
           >
             🤖 AI Farm Insights
           </Typography>
-
 
           <Typography
             sx={{
@@ -911,7 +917,6 @@ Generated by AgroLens PLF
             farm data.
           </Typography>
 
-
           <Box
             sx={{
               display: "grid",
@@ -922,10 +927,10 @@ Generated by AgroLens PLF
               gap: 2,
             }}
           >
-
-            {Array.isArray(overview?.ai_insights) &&
+            {Array.isArray(
+              overview?.ai_insights
+            ) &&
             overview.ai_insights.length > 0 ? (
-
               overview.ai_insights.map(
                 (insight, index) => (
                   <Insight
@@ -941,25 +946,35 @@ Generated by AgroLens PLF
                   />
                 )
               )
-
             ) : (
+              <>
+                <Insight
+                  title="Production"
+                  text="Production data is currently available."
+                />
 
-              <Insight
-                title="Farm Status"
-                text="No AI insights are currently available."
-              />
+                <Insight
+                  title="Animal Health"
+                  text={`${healthPercentage.toFixed(
+                    1
+                  )}% of animals are currently classified as healthy.`}
+                />
 
+                <Insight
+                  title="Attention Required"
+                  text={
+                    critical > 0
+                      ? `${critical} animal(s) require health monitoring.`
+                      : "No animals are currently classified as critical."
+                  }
+                />
+              </>
             )}
-
           </Box>
-
         </CardContent>
       </Card>
 
-
-      {/* =====================================================
-          FOOTER
-      ===================================================== */}
+      {/* FOOTER */}
 
       <Box
         sx={{
@@ -970,16 +985,12 @@ Generated by AgroLens PLF
           gap: 2,
         }}
       >
-
         <Typography
           variant="body2"
           color="text.secondary"
         >
-          Generated by{" "}
-          {overview?.generated_by ||
-            "AgroLens PLF"}
+          Generated by Apollo Agriverse - PashuSense
         </Typography>
-
 
         <Typography
           variant="body2"
@@ -987,17 +998,14 @@ Generated by AgroLens PLF
         >
           Report type: {reportType}
         </Typography>
-
       </Box>
-
     </Box>
   );
 }
 
-
-// =====================================================
+// ============================================================
 // KPI CARD
-// =====================================================
+// ============================================================
 
 function KpiCard({
   title,
@@ -1017,7 +1025,6 @@ function KpiCard({
       }}
     >
       <CardContent>
-
         <Box
           sx={{
             display: "flex",
@@ -1025,7 +1032,6 @@ function KpiCard({
             alignItems: "center",
           }}
         >
-
           <Box>
             <Typography
               variant="body2"
@@ -1033,7 +1039,6 @@ function KpiCard({
             >
               {title}
             </Typography>
-
 
             <Typography
               variant="h5"
@@ -1043,7 +1048,6 @@ function KpiCard({
               {value}
             </Typography>
           </Box>
-
 
           <Box
             sx={{
@@ -1060,14 +1064,17 @@ function KpiCard({
           >
             {icon}
           </Box>
-
         </Box>
-
 
         <Typography
           variant="caption"
           sx={{
-            color: "#16a34a",
+            color:
+              subtitle?.includes("↑")
+                ? "#16a34a"
+                : subtitle?.includes("↓")
+                ? "#dc2626"
+                : "#64748b",
             fontWeight: 700,
             display: "block",
             mt: 2,
@@ -1075,16 +1082,14 @@ function KpiCard({
         >
           {subtitle}
         </Typography>
-
       </CardContent>
     </Card>
   );
 }
 
-
-// =====================================================
+// ============================================================
 // PERFORMANCE ROW
-// =====================================================
+// ============================================================
 
 function PerformanceRow({
   label,
@@ -1098,7 +1103,6 @@ function PerformanceRow({
 
   return (
     <Box sx={{ mb: 2.5 }}>
-
       <Box
         sx={{
           display: "flex",
@@ -1106,7 +1110,6 @@ function PerformanceRow({
           mb: 0.7,
         }}
       >
-
         <Typography
           variant="body2"
           fontWeight={700}
@@ -1114,17 +1117,14 @@ function PerformanceRow({
           {label}
         </Typography>
 
-
         <Typography
           variant="body2"
           fontWeight={900}
           sx={{ color }}
         >
-          {safeValue}%
+          {safeValue.toFixed(1)}%
         </Typography>
-
       </Box>
-
 
       <LinearProgress
         variant="determinate"
@@ -1140,15 +1140,13 @@ function PerformanceRow({
           },
         }}
       />
-
     </Box>
   );
 }
 
-
-// =====================================================
+// ============================================================
 // HEALTH ROW
-// =====================================================
+// ============================================================
 
 function HealthRow({
   label,
@@ -1171,7 +1169,6 @@ function HealthRow({
         mb: 2.5,
       }}
     >
-
       <Box
         sx={{
           color,
@@ -1181,16 +1178,13 @@ function HealthRow({
         {icon}
       </Box>
 
-
       <Box sx={{ flex: 1 }}>
-
         <Box
           sx={{
             display: "flex",
             justifyContent: "space-between",
           }}
         >
-
           <Typography
             variant="body2"
             fontWeight={700}
@@ -1198,15 +1192,10 @@ function HealthRow({
             {label}
           </Typography>
 
-
-          <Typography
-            fontWeight={900}
-          >
+          <Typography fontWeight={900}>
             {value}
           </Typography>
-
         </Box>
-
 
         <LinearProgress
           variant="determinate"
@@ -1221,17 +1210,14 @@ function HealthRow({
             },
           }}
         />
-
       </Box>
-
     </Box>
   );
 }
 
-
-// =====================================================
+// ============================================================
 // PRODUCTION CARD
-// =====================================================
+// ============================================================
 
 function ProductionCard({
   title,
@@ -1255,7 +1241,6 @@ function ProductionCard({
         backgroundColor: background,
       }}
     >
-
       <Box
         sx={{
           display: "flex",
@@ -1265,15 +1250,12 @@ function ProductionCard({
           mb: 1,
         }}
       >
-
         {icon}
 
         <Typography fontWeight={800}>
           {title}
         </Typography>
-
       </Box>
-
 
       <Typography
         variant="h5"
@@ -1282,14 +1264,18 @@ function ProductionCard({
         {value}
       </Typography>
 
+      {/* FIXED TARGET DISPLAY */}
 
       <Typography
-        variant="caption"
+        variant="body2"
         color="text.secondary"
+        sx={{
+          mt: 0.5,
+        }}
       >
-        Target: {target}
+        Target:{" "}
+        <strong>{target}</strong>
       </Typography>
-
 
       <LinearProgress
         variant="determinate"
@@ -1306,27 +1292,24 @@ function ProductionCard({
         }}
       />
 
-
       <Typography
-        variant="caption"
+        variant="body2"
         fontWeight={800}
         sx={{
           display: "block",
-          mt: 0.5,
+          mt: 1,
           color,
         }}
       >
-        {safePercentage}% achieved
+        {safePercentage.toFixed(1)}% achieved
       </Typography>
-
     </Box>
   );
 }
 
-
-// =====================================================
+// ============================================================
 // AI INSIGHT
-// =====================================================
+// ============================================================
 
 function Insight({
   title,
@@ -1342,7 +1325,6 @@ function Insight({
         height: "100%",
       }}
     >
-
       <Typography
         fontWeight={900}
         sx={{ mb: 0.5 }}
@@ -1350,14 +1332,13 @@ function Insight({
         {title}
       </Typography>
 
-
       <Typography
         variant="body2"
         sx={{ opacity: 0.8 }}
       >
         {text}
       </Typography>
-
     </Box>
   );
 }
+

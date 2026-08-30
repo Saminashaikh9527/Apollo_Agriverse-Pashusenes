@@ -1,49 +1,65 @@
+
 import api from "./axios";
 
 // ============================================================
-// GET ALL HEALTH RECORDS
+// GET HEALTH RECORDS
 // ============================================================
 
-export async function getHealthRecords() {
-  const response = await api.get("/health/");
+export const getHealthRecords = async (animalId = null) => {
+  const url = animalId
+    ? `/api/health/?animal_id=${animalId}`
+    : "/api/health/";
+
+  const response = await api.get(url);
   return response.data;
-}
+};
 
 // ============================================================
 // GET SINGLE HEALTH RECORD
 // ============================================================
 
-export async function getHealthRecord(healthRecordId) {
-  const response = await api.get(`/health/${healthRecordId}`);
+export const getHealthRecord = async (id) => {
+  const response = await api.get(`/api/health/${id}`);
   return response.data;
-}
+};
 
 // ============================================================
 // CREATE HEALTH RECORD
 // ============================================================
 
-export async function createHealthRecord(healthData) {
-  const response = await api.post("/health/", healthData);
+export const createHealthRecord = async (data) => {
+  const response = await api.post("/api/health/", data);
   return response.data;
-}
+};
 
 // ============================================================
 // UPDATE HEALTH RECORD
 // ============================================================
 
-export async function updateHealthRecord(healthRecordId, healthData) {
-  const response = await api.patch(
-    `/health/${healthRecordId}`,
-    healthData
-  );
+export const updateHealthRecord = async (id, data) => {
+  const response = await api.put(`/api/health/${id}`, data);
   return response.data;
-}
+};
+
+// ============================================================
+// PATCH HEALTH RECORD
+// ============================================================
+
+export const patchHealthRecord = async (id, data) => {
+  const response = await api.patch(
+    `/api/health/${id}`,
+    data
+  );
+
+  return response.data;
+};
 
 // ============================================================
 // DELETE HEALTH RECORD
 // ============================================================
 
-export async function deleteHealthRecord(healthRecordId) {
-  const response = await api.delete(`/health/${healthRecordId}`);
+export const deleteHealthRecord = async (id) => {
+  const response = await api.delete(`/api/health/${id}`);
   return response.data;
-}
+};
+
