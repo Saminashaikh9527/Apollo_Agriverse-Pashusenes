@@ -1,7 +1,11 @@
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+from fastapi.openapi.docs import (
+    get_swagger_ui_html,
+    get_redoc_html,
+)
 from sqlalchemy import text
 
 
@@ -19,6 +23,11 @@ from app.api.reports.routes import router as reports_router
 # AI
 from app.api.ai.routes import router as ai_router
 
+# ML Predictions
+from app.api.ml_predictions.routes import (
+    router as ml_predictions_router,
+)
+
 
 # ============================================================
 # OPTIONAL MODULE ROUTES
@@ -26,32 +35,50 @@ from app.api.ai.routes import router as ai_router
 
 try:
     from app.api.wool.routes import router as wool_router
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     wool_router = None
 
 
 try:
-    from app.api.vaccination.routes import router as vaccination_router
-except ModuleNotFoundError:
+    from app.api.vaccination.routes import (
+        router as vaccination_router
+    )
+except (ModuleNotFoundError, ImportError):
     vaccination_router = None
 
 
 try:
     from app.api.feed.routes import router as feed_router
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     feed_router = None
 
 
 try:
     from app.api.egg.routes import router as egg_router
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     egg_router = None
 
 
 try:
     from app.api.growth.routes import router as growth_router
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     growth_router = None
+
+
+try:
+    from app.api.digital_twin.routes import (
+        router as digital_twin_router
+    )
+except (ModuleNotFoundError, ImportError):
+    digital_twin_router = None
+
+
+try:
+    from app.api.milk_forecast.routes import (
+        router as milk_forecast_router
+    )
+except (ModuleNotFoundError, ImportError):
+    milk_forecast_router = None
 
 
 # ============================================================
@@ -60,8 +87,6 @@ except ModuleNotFoundError:
 
 from app.core.config import CORS_ORIGINS
 
-# Register all SQLAlchemy models
-# before handling requests.
 import app.models
 
 from app.database.connection import engine
@@ -73,15 +98,11 @@ from app.database.connection import engine
 
 app = FastAPI(
     title="Apollo Agriverse PashuSense API",
-
     description=(
         "AI Powered Precision Livestock Farming System "
         "for Apollo Agriverse PashuSense"
     ),
-
     version="1.0.0",
-
-    # We use customized Swagger and ReDoc below.
     docs_url=None,
     redoc_url=None,
 )
@@ -100,24 +121,16 @@ FRONTEND_HOME = "http://localhost:5173/dashboard"
 
 app.add_middleware(
     CORSMiddleware,
-
     allow_origins=CORS_ORIGINS,
-
     allow_credentials=True,
-
     allow_methods=["*"],
-
     allow_headers=["*"],
 )
 
 
 # ============================================================
-# API ROUTES
+# CORE ROUTES
 # ============================================================
-
-# ------------------------------------------------------------
-# Authentication
-# ------------------------------------------------------------
 
 app.include_router(
     auth_router,
@@ -126,20 +139,12 @@ app.include_router(
 )
 
 
-# ------------------------------------------------------------
-# Animals
-# ------------------------------------------------------------
-
 app.include_router(
     animals_router,
     prefix="/api",
     tags=["Animals"],
 )
 
-
-# ------------------------------------------------------------
-# Farms
-# ------------------------------------------------------------
 
 app.include_router(
     farms_router,
@@ -148,20 +153,12 @@ app.include_router(
 )
 
 
-# ------------------------------------------------------------
-# Animal Health
-# ------------------------------------------------------------
-
 app.include_router(
     health_router,
     prefix="/api",
     tags=["Animal Health"],
 )
 
-
-# ------------------------------------------------------------
-# Milk Production
-# ------------------------------------------------------------
 
 app.include_router(
     milk_router,
@@ -180,17 +177,18 @@ app.include_router(
     tags=["AI & Computer Vision"],
 )
 
+app.include_router(
+    ml_predictions_router,
+    prefix="/api",
+    tags=["ML Predictions"],
+)
+
 
 # ============================================================
 # OPTIONAL MODULES
 # ============================================================
 
-# ------------------------------------------------------------
-# Wool
-# ------------------------------------------------------------
-
 if wool_router is not None:
-
     app.include_router(
         wool_router,
         prefix="/api",
@@ -198,12 +196,7 @@ if wool_router is not None:
     )
 
 
-# ------------------------------------------------------------
-# Vaccination
-# ------------------------------------------------------------
-
 if vaccination_router is not None:
-
     app.include_router(
         vaccination_router,
         prefix="/api",
@@ -211,12 +204,7 @@ if vaccination_router is not None:
     )
 
 
-# ------------------------------------------------------------
-# Feed
-# ------------------------------------------------------------
-
 if feed_router is not None:
-
     app.include_router(
         feed_router,
         prefix="/api",
@@ -224,12 +212,7 @@ if feed_router is not None:
     )
 
 
-# ------------------------------------------------------------
-# Egg
-# ------------------------------------------------------------
-
 if egg_router is not None:
-
     app.include_router(
         egg_router,
         prefix="/api",
@@ -237,16 +220,27 @@ if egg_router is not None:
     )
 
 
-# ------------------------------------------------------------
-# Growth
-# ------------------------------------------------------------
-
 if growth_router is not None:
-
     app.include_router(
         growth_router,
         prefix="/api",
         tags=["Growth Tracking"],
+    )
+
+
+if digital_twin_router is not None:
+    app.include_router(
+        digital_twin_router,
+        prefix="/api",
+        tags=["Digital Twin"],
+    )
+
+
+if milk_forecast_router is not None:
+    app.include_router(
+        milk_forecast_router,
+        prefix="/api",
+        tags=["Milk Forecast"],
     )
 
 
@@ -262,7 +256,7 @@ app.include_router(
 
 
 # ============================================================
-# CUSTOM SWAGGER UI
+# CUSTOM SWAGGER
 # ============================================================
 
 @app.get(
@@ -278,35 +272,21 @@ async def custom_swagger_ui():
 
     html = response.body.decode("utf-8")
 
-    # --------------------------------------------------------
-    # BACK TO HOME BUTTON
-    # --------------------------------------------------------
-
     home_button = f"""
     <style>
 
-        /* ====================================================
-           APOLLO AGRIVERSE PASHUSENSE HOME BUTTON
-           ==================================================== */
-
         #apollo-home-button {{
             position: fixed;
-
             top: 14px;
             left: 20px;
-
             z-index: 999999;
 
             display: flex;
-
             align-items: center;
-
             justify-content: center;
-
             gap: 8px;
 
             min-width: 145px;
-
             padding: 10px 18px;
 
             background: linear-gradient(
@@ -316,9 +296,7 @@ async def custom_swagger_ui():
             );
 
             color: white;
-
             border: none;
-
             border-radius: 10px;
 
             font-family:
@@ -327,83 +305,60 @@ async def custom_swagger_ui():
                 sans-serif;
 
             font-size: 14px;
-
             font-weight: 800;
 
             text-decoration: none;
-
             cursor: pointer;
 
             box-shadow:
                 0 4px 14px
                 rgba(0, 0, 0, 0.20);
 
-            transition:
-                all 0.2s ease;
+            transition: all 0.2s ease;
         }}
 
-
         #apollo-home-button:hover {{
-
             background: linear-gradient(
                 135deg,
                 #065f46,
                 #047857
             );
 
-            transform:
-                translateY(-2px);
+            transform: translateY(-2px);
 
             box-shadow:
                 0 7px 18px
                 rgba(0, 0, 0, 0.25);
         }}
 
-
         #apollo-home-button .arrow {{
-
             font-size: 22px;
-
             line-height: 1;
-
             font-weight: 900;
         }}
 
-
         #apollo-home-button .home-text {{
-
             line-height: 1;
         }}
 
-
-        /* ====================================================
-           SWAGGER TOP SPACE
-           ==================================================== */
-
         .swagger-ui .topbar {{
-
             padding-left: 175px;
         }}
 
     </style>
-
 
     <a
         id="apollo-home-button"
         href="{FRONTEND_HOME}"
         title="Go back to Apollo Agriverse PashuSense Dashboard"
     >
-
         <span class="arrow">←</span>
-
         <span class="home-text">
             Back to Home
         </span>
-
     </a>
     """
 
-    # Insert button before </head>
     html = html.replace(
         "</head>",
         home_button + "</head>",
@@ -432,28 +387,18 @@ async def custom_redoc():
 
     html = response.body.decode("utf-8")
 
-    # --------------------------------------------------------
-    # BACK TO HOME BUTTON
-    # --------------------------------------------------------
-
     home_button = f"""
     <style>
 
         #apollo-redoc-home-button {{
-
             position: fixed;
-
             top: 18px;
             left: 20px;
-
             z-index: 999999;
 
             display: flex;
-
             align-items: center;
-
             justify-content: center;
-
             gap: 8px;
 
             padding: 10px 18px;
@@ -465,7 +410,6 @@ async def custom_redoc():
             );
 
             color: white;
-
             border-radius: 10px;
 
             font-family:
@@ -474,7 +418,6 @@ async def custom_redoc():
                 sans-serif;
 
             font-size: 14px;
-
             font-weight: 800;
 
             text-decoration: none;
@@ -483,50 +426,37 @@ async def custom_redoc():
                 0 4px 14px
                 rgba(0, 0, 0, 0.20);
 
-            transition:
-                all 0.2s ease;
+            transition: all 0.2s ease;
         }}
 
-
         #apollo-redoc-home-button:hover {{
-
             background: linear-gradient(
                 135deg,
                 #065f46,
                 #047857
             );
 
-            transform:
-                translateY(-2px);
+            transform: translateY(-2px);
 
             box-shadow:
                 0 7px 18px
                 rgba(0, 0, 0, 0.25);
         }}
 
-
         #apollo-redoc-home-button .arrow {{
-
             font-size: 22px;
-
             line-height: 1;
         }}
 
     </style>
-
 
     <a
         id="apollo-redoc-home-button"
         href="{FRONTEND_HOME}"
         title="Go back to Apollo Agriverse PashuSense Dashboard"
     >
-
         <span class="arrow">←</span>
-
-        <span>
-            Back to Home
-        </span>
-
+        <span>Back to Home</span>
     </a>
     """
 
@@ -549,25 +479,19 @@ async def custom_redoc():
 def root():
 
     return {
-
         "message": (
             "Apollo Agriverse PashuSense Backend "
             "is running"
         ),
-
         "status": "online",
-
         "application": (
             "Apollo Agriverse PashuSense"
         ),
-
         "frontend": FRONTEND_HOME,
-
         "swagger": "/docs",
-
         "redoc": "/redoc",
-
         "openapi": "/openapi.json",
+        "ml_predictions": "/api/ml-predictions",
     }
 
 
@@ -577,10 +501,6 @@ def root():
 
 @app.get("/database-test")
 def database_test():
-    """
-    Compatibility endpoint that verifies
-    the configured database connection.
-    """
 
     try:
 
@@ -593,11 +513,8 @@ def database_test():
             ).scalar_one()
 
         return {
-
             "database": database,
-
             "connection": "Successful",
-
             "application": (
                 "Apollo Agriverse PashuSense"
             ),
@@ -606,12 +523,10 @@ def database_test():
     except Exception as exc:
 
         return {
-
             "connection": "Failed",
-
             "application": (
                 "Apollo Agriverse PashuSense"
             ),
-
             "error": str(exc),
         }
+

@@ -1,20 +1,16 @@
+
 import api from "./axios";
 
 // ============================================================
-// GET ALL VACCINATION RECORDS
+// GET VACCINATION RECORDS
 // ============================================================
 
-export const getVaccinationRecords = async () => {
-  const response = await api.get("/vaccination/");
-  return response.data;
-};
+export const getVaccinationRecords = async (animalId = null) => {
+  const url = animalId
+    ? `/api/vaccination/?animal_id=${animalId}`
+    : "/api/vaccination/";
 
-// ============================================================
-// CREATE VACCINATION RECORD
-// ============================================================
-
-export const createVaccinationRecord = async (data) => {
-  const response = await api.post("/vaccination/", data);
+  const response = await api.get(url);
   return response.data;
 };
 
@@ -23,7 +19,20 @@ export const createVaccinationRecord = async (data) => {
 // ============================================================
 
 export const getVaccinationRecord = async (id) => {
-  const response = await api.get(`/vaccination/${id}`);
+  const response = await api.get(`/api/vaccination/${id}`);
+  return response.data;
+};
+
+// ============================================================
+// CREATE VACCINATION RECORD
+// ============================================================
+
+export const createVaccinationRecord = async (data) => {
+  const response = await api.post(
+    "/api/vaccination/",
+    data
+  );
+
   return response.data;
 };
 
@@ -32,7 +41,24 @@ export const getVaccinationRecord = async (id) => {
 // ============================================================
 
 export const updateVaccinationRecord = async (id, data) => {
-  const response = await api.patch(`/vaccination/${id}`, data);
+  const response = await api.put(
+    `/api/vaccination/${id}`,
+    data
+  );
+
+  return response.data;
+};
+
+// ============================================================
+// PATCH VACCINATION RECORD
+// ============================================================
+
+export const patchVaccinationRecord = async (id, data) => {
+  const response = await api.patch(
+    `/api/vaccination/${id}`,
+    data
+  );
+
   return response.data;
 };
 
@@ -41,6 +67,10 @@ export const updateVaccinationRecord = async (id, data) => {
 // ============================================================
 
 export const deleteVaccinationRecord = async (id) => {
-  const response = await api.delete(`/vaccination/${id}`);
+  const response = await api.delete(
+    `/api/vaccination/${id}`
+  );
+
   return response.data;
 };
+

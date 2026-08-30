@@ -1,3 +1,4 @@
+
 import { useMemo, useState, useEffect } from "react";
 
 import {
@@ -34,6 +35,7 @@ import {
   LocalDrink,
   MonitorHeart,
   Close,
+  Delete,
 } from "@mui/icons-material";
 
 import { useNavigate } from "react-router-dom";
@@ -41,6 +43,7 @@ import { useNavigate } from "react-router-dom";
 import {
   getAnimals as fetchAnimals,
   createAnimal,
+  deleteAnimal,
 } from "../api/animals";
 
 
@@ -71,33 +74,27 @@ function getAnimalEmoji(species) {
 }
 
 
-/*
- * Backend animal -> frontend animal
- *
- * Your backend currently uses fields such as:
- * animal_id, tag_number, species, breed, gender,
- * birth_date, weight, status
- *
- * The UI uses:
- * id, tag, name, health, etc.
- */
+/* =========================================================
+   NORMALIZE ANIMAL
+========================================================= */
+
 function normalizeAnimal(animal) {
   const species =
-    animal.species ||
+    animal?.species ||
     "Unknown";
 
   const tag =
-    animal.tag ||
-    animal.tag_number ||
-    `ANIMAL-${animal.animal_id || ""}`;
+    animal?.tag ||
+    animal?.tag_number ||
+    `ANIMAL-${animal?.animal_id || ""}`;
 
   const health =
-    animal.health ||
-    animal.health_status ||
+    animal?.health ||
+    animal?.health_status ||
     (
-      animal.status === "active"
+      animal?.status === "active"
         ? "Healthy"
-        : animal.status === "inactive"
+        : animal?.status === "inactive"
         ? "Attention"
         : "Healthy"
     );
@@ -106,61 +103,65 @@ function normalizeAnimal(animal) {
     ...animal,
 
     id:
-      animal.id ??
-      animal.animal_id ??
+      animal?.id ??
+      animal?.animal_id ??
       tag,
 
     animal_id:
-      animal.animal_id ??
-      animal.id,
+      animal?.animal_id ??
+      animal?.id,
 
     tag,
 
     name:
-      animal.name ||
+      animal?.name ||
       tag,
 
     species,
 
     breed:
-      animal.breed ||
+      animal?.breed ||
       "Not specified",
 
     age:
-      animal.age ||
-      calculateAge(animal.birth_date),
+      animal?.age ||
+      calculateAge(animal?.birth_date),
 
     gender:
-      animal.gender ||
+      animal?.gender ||
       "Not specified",
 
     temperature:
-      animal.temperature ||
+      animal?.temperature ||
       "—",
 
     activity:
-      Number.isFinite(Number(animal.activity))
+      Number.isFinite(Number(animal?.activity))
         ? Number(animal.activity)
         : 80,
 
     milk:
-      animal.milk ??
-      animal.milk_today ??
+      animal?.milk ??
+      animal?.milk_today ??
       "—",
 
     health,
 
     lastCheck:
-      animal.lastCheck ||
-      animal.last_check ||
+      animal?.lastCheck ||
+      animal?.last_check ||
       "Not available",
 
     emoji:
-      animal.emoji ||
+      animal?.emoji ||
       getAnimalEmoji(species),
   };
 }
 
+
+/* =========================================================
+   CALCULATE AGE
+========================================================= */
 
 function calculateAge(birthDate) {
   if (!birthDate) {
@@ -202,6 +203,44 @@ function calculateAge(birthDate) {
 
 
 /* =========================================================
+   FORMAT API ERROR
+========================================================= */
+
+function getAPIErrorMessage(err) {
+  const detail =
+    err?.response?.data?.detail;
+
+  /* FastAPI validation error */
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        const field =
+          Array.isArray(item?.loc)
+            ? item.loc[item.loc.length - 1]
+            : "field";
+
+        return `${field}: ${
+          item?.msg || "Invalid value"
+        }`;
+      })
+      .join(" • ");
+  }
+
+  /* Normal FastAPI error */
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  /* Axios error */
+  if (typeof err?.message === "string") {
+    return err.message;
+  }
+
+  return "Failed to add animal.";
+}
+
+
+/* =========================================================
    MAIN COMPONENT
 ========================================================= */
 
@@ -230,6 +269,12 @@ export default function Animals() {
     useState(null);
 
   const [addOpen, setAddOpen] =
+    useState(false);
+
+  const [deleteTarget, setDeleteTarget] =
+    useState(null);
+
+  const [deleting, setDeleting] =
     useState(false);
 
 
@@ -264,6 +309,7 @@ export default function Animals() {
         setAnimals(
           list.map(normalizeAnimal)
         );
+
       } catch (err) {
         console.error(
           "Failed to fetch animals:",
@@ -277,6 +323,7 @@ export default function Animals() {
 
           setAnimals([]);
         }
+
       } finally {
         if (mounted) {
           setLoading(false);
@@ -294,10 +341,6 @@ export default function Animals() {
 
   /* =====================================================
      FILTER
-     
-     IMPORTANT:
-     This hook MUST run on every render.
-     It cannot be placed after the loading return.
   ====================================================== */
 
   const filteredAnimals =
@@ -309,17 +352,17 @@ export default function Animals() {
         (animal) => {
           const tag =
             String(
-              animal.tag || ""
+              animal?.tag || ""
             ).toLowerCase();
 
           const name =
             String(
-              animal.name || ""
+              animal?.name || ""
             ).toLowerCase();
 
           const breed =
             String(
-              animal.breed || ""
+              animal?.breed || ""
             ).toLowerCase();
 
           const matchesSearch =
@@ -330,11 +373,11 @@ export default function Animals() {
 
           const matchesSpecies =
             speciesFilter === "All" ||
-            animal.species === speciesFilter;
+            animal?.species === speciesFilter;
 
           const matchesHealth =
             healthFilter === "All" ||
-            animal.health === healthFilter;
+            animal?.health === healthFilter;
 
           return (
             matchesSearch &&
@@ -361,26 +404,90 @@ export default function Animals() {
   const healthyAnimals =
     animals.filter(
       (animal) =>
-        animal.health === "Healthy"
+        animal?.health === "Healthy"
     ).length;
 
   const attentionAnimals =
     animals.filter(
       (animal) =>
-        animal.health === "Attention"
+        animal?.health === "Attention"
     ).length;
 
   const highRiskAnimals =
     animals.filter(
       (animal) =>
-        animal.health === "High Risk"
+        animal?.health === "High Risk"
     ).length;
 
 
   /* =====================================================
+     DELETE ANIMAL
+  ====================================================== */
+
+  const handleDeleteAnimal = async () => {
+    if (!deleteTarget) {
+      return;
+    }
+
+    const animalId =
+      deleteTarget.animal_id ??
+      deleteTarget.id;
+
+    if (!animalId) {
+      setError(
+        "Unable to delete animal: animal ID is missing."
+      );
+      setDeleteTarget(null);
+      return;
+    }
+
+    try {
+      setDeleting(true);
+      setError(null);
+
+      await deleteAnimal(animalId);
+
+      /* Remove from frontend immediately */
+      setAnimals((prev) =>
+        prev.filter(
+          (animal) =>
+            (animal.animal_id ?? animal.id) !== animalId
+        )
+      );
+
+      /* Close detail dialog if deleted animal was selected */
+      if (
+        selectedAnimal &&
+        (selectedAnimal.animal_id ??
+          selectedAnimal.id) === animalId
+      ) {
+        setSelectedAnimal(null);
+      }
+
+      setDeleteTarget(null);
+
+    } catch (err) {
+      console.error(
+        "Failed to delete animal:",
+        err
+      );
+
+      setError(
+        getAPIErrorMessage(err)
+          .replace(
+            "Failed to add animal.",
+            "Failed to delete animal."
+          )
+      );
+
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+
+  /* =====================================================
      LOADING
-     
-     This return is AFTER all Hooks.
   ====================================================== */
 
   if (loading) {
@@ -431,7 +538,7 @@ export default function Animals() {
             setError(null)
           }
         >
-          {error}
+          {String(error)}
         </Alert>
       )}
 
@@ -443,8 +550,7 @@ export default function Animals() {
       <Box
         sx={{
           display: "flex",
-          justifyContent:
-            "space-between",
+          justifyContent: "space-between",
           alignItems: {
             xs: "flex-start",
             md: "center",
@@ -592,8 +698,7 @@ export default function Animals() {
         sx={{
           mb: 3,
           borderRadius: 4,
-          border:
-            "1px solid #e5e7eb",
+          border: "1px solid #e5e7eb",
           boxShadow: "none",
         }}
       >
@@ -749,8 +854,7 @@ export default function Animals() {
       <Box
         sx={{
           display: "flex",
-          justifyContent:
-            "space-between",
+          justifyContent: "space-between",
           alignItems: "center",
           mb: 2,
         }}
@@ -798,7 +902,11 @@ export default function Animals() {
                 lg: 4,
                 xl: 3,
               }}
-              key={animal.id}
+              key={
+                animal.animal_id ??
+                animal.id ??
+                animal.tag
+              }
             >
 
               <AnimalCard
@@ -814,6 +922,9 @@ export default function Animals() {
                       animal.tag
                     )}`
                   )
+                }
+                onDelete={() =>
+                  setDeleteTarget(animal)
                 }
               />
 
@@ -899,12 +1010,6 @@ export default function Animals() {
           try {
             setError(null);
 
-            /*
-             * Try backend first.
-             *
-             * The API function should receive
-             * the backend-compatible object.
-             */
             const created =
               await createAnimal({
                 tag_number:
@@ -920,10 +1025,12 @@ export default function Animals() {
                   newAnimal.gender,
 
                 birth_date:
-                  newAnimal.birth_date || null,
+                  newAnimal.birth_date ||
+                  null,
 
                 weight:
-                  newAnimal.weight || null,
+                  newAnimal.weight ||
+                  null,
               });
 
             const normalized =
@@ -944,18 +1051,103 @@ export default function Animals() {
               err
             );
 
-            /*
-             * Do NOT silently create fake
-             * frontend-only data if backend
-             * creation fails.
-             */
             setError(
-              err?.response?.data?.detail ||
-              "Failed to add animal to the backend."
+              getAPIErrorMessage(err)
             );
+
+            throw err;
           }
         }}
       />
+
+
+      {/* =================================================
+          DELETE CONFIRMATION
+      ================================================== */}
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onClose={
+          deleting
+            ? undefined
+            : () => setDeleteTarget(null)
+        }
+        maxWidth="xs"
+        fullWidth
+      >
+
+        <DialogTitle
+          sx={{
+            fontWeight: 900,
+          }}
+        >
+          Delete Animal
+        </DialogTitle>
+
+        <DialogContent>
+
+          <Typography>
+            Are you sure you want to delete{" "}
+            <strong>
+              {deleteTarget?.tag || "this animal"}
+            </strong>
+            ?
+          </Typography>
+
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mt: 1.5 }}
+          >
+            This action will permanently remove
+            the animal from the farm records.
+          </Typography>
+
+        </DialogContent>
+
+        <DialogActions
+          sx={{ p: 2 }}
+        >
+
+          <Button
+            onClick={() =>
+              setDeleteTarget(null)
+            }
+            disabled={deleting}
+            sx={{
+              textTransform: "none",
+            }}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={
+              deleting
+                ? <CircularProgress
+                    size={18}
+                    color="inherit"
+                  />
+                : <Delete />
+            }
+            onClick={handleDeleteAnimal}
+            disabled={deleting}
+            sx={{
+              textTransform: "none",
+              borderRadius: 2,
+              fontWeight: 700,
+            }}
+          >
+            {deleting
+              ? "Deleting..."
+              : "Delete Animal"}
+          </Button>
+
+        </DialogActions>
+
+      </Dialog>
 
     </Box>
   );
@@ -978,16 +1170,13 @@ function AnimalStat({
     <Card
       sx={{
         borderRadius: 4,
-        border:
-          "1px solid #e5e7eb",
+        border: "1px solid #e5e7eb",
         boxShadow: "none",
         height: "100%",
-        transition:
-          "all 0.2s ease",
+        transition: "all 0.2s ease",
 
         "&:hover": {
-          transform:
-            "translateY(-3px)",
+          transform: "translateY(-3px)",
           boxShadow:
             "0 12px 25px rgba(0,0,0,0.06)",
         },
@@ -1043,6 +1232,7 @@ function AnimalCard({
   animal,
   onView,
   onDigitalTwin,
+  onDelete,
 }) {
   const healthConfig = {
     Healthy: {
@@ -1071,7 +1261,7 @@ function AnimalCard({
   };
 
   const status =
-    healthConfig[animal.health] ||
+    healthConfig[animal?.health] ||
     healthConfig.Healthy;
 
 
@@ -1079,16 +1269,13 @@ function AnimalCard({
     <Card
       sx={{
         borderRadius: 4,
-        border:
-          "1px solid #e5e7eb",
+        border: "1px solid #e5e7eb",
         boxShadow: "none",
         height: "100%",
-        transition:
-          "all 0.2s ease",
+        transition: "all 0.2s ease",
 
         "&:hover": {
-          transform:
-            "translateY(-4px)",
+          transform: "translateY(-4px)",
           boxShadow:
             "0 15px 35px rgba(0,0,0,0.08)",
         },
@@ -1102,10 +1289,8 @@ function AnimalCard({
         <Box
           sx={{
             display: "flex",
-            justifyContent:
-              "space-between",
-            alignItems:
-              "flex-start",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
             gap: 1,
           }}
         >
@@ -1113,8 +1298,7 @@ function AnimalCard({
           <Box
             sx={{
               display: "flex",
-              alignItems:
-                "center",
+              alignItems: "center",
               gap: 1.5,
               minWidth: 0,
             }}
@@ -1125,13 +1309,11 @@ function AnimalCard({
                 width: 58,
                 height: 58,
                 fontSize: 32,
-                backgroundColor:
-                  "#f8fafc",
-                border:
-                  "2px solid #f1f5f9",
+                backgroundColor: "#f8fafc",
+                border: "2px solid #f1f5f9",
               }}
             >
-              {animal.emoji}
+              {animal?.emoji}
             </Avatar>
 
             <Box
@@ -1144,7 +1326,7 @@ function AnimalCard({
                 fontWeight={900}
                 noWrap
               >
-                {animal.tag}
+                {animal?.tag}
               </Typography>
 
               <Typography
@@ -1152,7 +1334,7 @@ function AnimalCard({
                 color="text.secondary"
                 noWrap
               >
-                {animal.name}
+                {animal?.name}
               </Typography>
 
             </Box>
@@ -1160,22 +1342,49 @@ function AnimalCard({
           </Box>
 
 
-          <Chip
-            icon={status.icon}
-            label={
-              animal.health ||
-              "Healthy"
-            }
-            size="small"
+          {/* HEALTH + DELETE */}
+
+          <Box
             sx={{
-              color: status.color,
-              backgroundColor:
-                status.bg,
-              fontWeight: 800,
-              fontSize: 11,
+              display: "flex",
+              alignItems: "center",
+              gap: 0.5,
               flexShrink: 0,
             }}
-          />
+          >
+
+            <Chip
+              icon={status.icon}
+              label={
+                animal?.health ||
+                "Healthy"
+              }
+              size="small"
+              sx={{
+                color: status.color,
+                backgroundColor: status.bg,
+                fontWeight: 800,
+                fontSize: 11,
+              }}
+            />
+
+            <IconButton
+              size="small"
+              onClick={onDelete}
+              title="Delete animal"
+              sx={{
+                color: "#dc2626",
+                "&:hover": {
+                  backgroundColor: "#fee2e2",
+                },
+              }}
+            >
+              <Delete
+                fontSize="small"
+              />
+            </IconButton>
+
+          </Box>
 
         </Box>
 
@@ -1195,7 +1404,7 @@ function AnimalCard({
           >
             <InfoItem
               label="Species"
-              value={animal.species}
+              value={animal?.species}
             />
           </Grid>
 
@@ -1204,7 +1413,7 @@ function AnimalCard({
           >
             <InfoItem
               label="Breed"
-              value={animal.breed}
+              value={animal?.breed}
             />
           </Grid>
 
@@ -1213,7 +1422,7 @@ function AnimalCard({
           >
             <InfoItem
               label="Age"
-              value={animal.age}
+              value={animal?.age}
             />
           </Grid>
 
@@ -1222,7 +1431,7 @@ function AnimalCard({
           >
             <InfoItem
               label="Temperature"
-              value={animal.temperature}
+              value={animal?.temperature}
             />
           </Grid>
 
@@ -1236,8 +1445,7 @@ function AnimalCard({
           <Box
             sx={{
               display: "flex",
-              justifyContent:
-                "space-between",
+              justifyContent: "space-between",
               mb: 0.5,
             }}
           >
@@ -1253,7 +1461,7 @@ function AnimalCard({
               variant="caption"
               fontWeight={800}
             >
-              {animal.activity}%
+              {animal?.activity}%
             </Typography>
 
           </Box>
@@ -1264,22 +1472,21 @@ function AnimalCard({
               100,
               Math.max(
                 0,
-                Number(animal.activity) || 0
+                Number(animal?.activity) || 0
               )
             )}
             sx={{
               height: 7,
               borderRadius: 5,
-              backgroundColor:
-                "#e5e7eb",
+              backgroundColor: "#e5e7eb",
 
               "& .MuiLinearProgress-bar": {
                 borderRadius: 5,
 
                 backgroundColor:
-                  animal.activity >= 75
+                  Number(animal?.activity) >= 75
                     ? "#16a34a"
-                    : animal.activity >= 50
+                    : Number(animal?.activity) >= 50
                     ? "#f59e0b"
                     : "#dc2626",
               },
@@ -1291,15 +1498,15 @@ function AnimalCard({
 
         {/* MILK */}
 
-        {animal.milk !== "—" &&
-          animal.milk !== null &&
-          animal.milk !== undefined && (
+        {animal?.milk !== "—" &&
+          animal?.milk !== null &&
+          animal?.milk !== undefined && (
+
             <Box
               sx={{
                 mt: 2,
                 display: "flex",
-                alignItems:
-                  "center",
+                alignItems: "center",
                 gap: 1,
               }}
             >
@@ -1322,7 +1529,7 @@ function AnimalCard({
                 fontWeight={800}
                 color="#2563eb"
               >
-                {animal.milk}
+                {animal?.milk}
               </Typography>
 
             </Box>
@@ -1348,8 +1555,7 @@ function AnimalCard({
             onClick={onView}
             sx={{
               borderRadius: 2,
-              textTransform:
-                "none",
+              textTransform: "none",
               fontWeight: 700,
             }}
           >
@@ -1366,8 +1572,7 @@ function AnimalCard({
             onClick={onDigitalTwin}
             sx={{
               borderRadius: 2,
-              textTransform:
-                "none",
+              textTransform: "none",
               fontWeight: 700,
 
               background:
@@ -1391,12 +1596,11 @@ function AnimalCard({
           sx={{
             display: "block",
             mt: 1.5,
-            textAlign:
-              "center",
+            textAlign: "center",
           }}
         >
           Last checked:{" "}
-          {animal.lastCheck}
+          {animal?.lastCheck}
         </Typography>
 
       </CardContent>
@@ -1416,6 +1620,7 @@ function InfoItem({
 }) {
   return (
     <Box>
+
       <Typography
         variant="caption"
         color="text.secondary"
@@ -1430,6 +1635,7 @@ function InfoItem({
       >
         {value || "—"}
       </Typography>
+
     </Box>
   );
 }
@@ -1461,18 +1667,15 @@ function AnimalDetailsDialog({
         <Box
           sx={{
             display: "flex",
-            justifyContent:
-              "space-between",
-            alignItems:
-              "center",
+            justifyContent: "space-between",
+            alignItems: "center",
           }}
         >
 
           <Box
             sx={{
               display: "flex",
-              alignItems:
-                "center",
+              alignItems: "center",
               gap: 1.5,
             }}
           >
@@ -1484,7 +1687,7 @@ function AnimalDetailsDialog({
                 fontSize: 30,
               }}
             >
-              {animal.emoji}
+              {animal?.emoji}
             </Avatar>
 
             <Box>
@@ -1492,14 +1695,14 @@ function AnimalDetailsDialog({
               <Typography
                 fontWeight={900}
               >
-                {animal.tag}
+                {animal?.tag}
               </Typography>
 
               <Typography
                 variant="body2"
                 color="text.secondary"
               >
-                {animal.name}
+                {animal?.name}
               </Typography>
 
             </Box>
@@ -1531,7 +1734,7 @@ function AnimalDetailsDialog({
           >
             <Detail
               label="Species"
-              value={animal.species}
+              value={animal?.species}
             />
           </Grid>
 
@@ -1540,7 +1743,7 @@ function AnimalDetailsDialog({
           >
             <Detail
               label="Breed"
-              value={animal.breed}
+              value={animal?.breed}
             />
           </Grid>
 
@@ -1549,7 +1752,7 @@ function AnimalDetailsDialog({
           >
             <Detail
               label="Age"
-              value={animal.age}
+              value={animal?.age}
             />
           </Grid>
 
@@ -1558,7 +1761,7 @@ function AnimalDetailsDialog({
           >
             <Detail
               label="Gender"
-              value={animal.gender}
+              value={animal?.gender}
             />
           </Grid>
 
@@ -1567,7 +1770,7 @@ function AnimalDetailsDialog({
           >
             <Detail
               label="Temperature"
-              value={animal.temperature}
+              value={animal?.temperature}
             />
           </Grid>
 
@@ -1576,7 +1779,7 @@ function AnimalDetailsDialog({
           >
             <Detail
               label="Activity"
-              value={`${animal.activity}%`}
+              value={`${animal?.activity}%`}
             />
           </Grid>
 
@@ -1585,7 +1788,7 @@ function AnimalDetailsDialog({
           >
             <Detail
               label="Milk Today"
-              value={animal.milk}
+              value={animal?.milk}
             />
           </Grid>
 
@@ -1594,7 +1797,7 @@ function AnimalDetailsDialog({
           >
             <Detail
               label="Last Check"
-              value={animal.lastCheck}
+              value={animal?.lastCheck}
             />
           </Grid>
 
@@ -1606,8 +1809,7 @@ function AnimalDetailsDialog({
             mt: 3,
             p: 2,
             borderRadius: 3,
-            backgroundColor:
-              "#f8fafc",
+            backgroundColor: "#f8fafc",
           }}
         >
 
@@ -1622,13 +1824,12 @@ function AnimalDetailsDialog({
             color="text.secondary"
             variant="body2"
           >
-            {animal.health ===
-            "Healthy"
+            {animal?.health === "Healthy"
               ? "The animal is currently showing normal health and activity."
-              : animal.health ===
-                "Attention"
+              : animal?.health === "Attention"
               ? "The animal is showing unusual activity and should be monitored."
-              : "This animal requires immediate health inspection."}
+              : "This animal requires immediate health inspection."
+            }
           </Typography>
 
         </Box>
@@ -1643,8 +1844,7 @@ function AnimalDetailsDialog({
         <Button
           onClick={onClose}
           sx={{
-            textTransform:
-              "none",
+            textTransform: "none",
           }}
         >
           Close
@@ -1657,8 +1857,7 @@ function AnimalDetailsDialog({
           }
           onClick={onDigitalTwin}
           sx={{
-            textTransform:
-              "none",
+            textTransform: "none",
             borderRadius: 2,
             fontWeight: 700,
           }}
@@ -1686,8 +1885,7 @@ function Detail({
       sx={{
         p: 1.5,
         borderRadius: 2,
-        backgroundColor:
-          "#f8fafc",
+        backgroundColor: "#f8fafc",
       }}
     >
 
@@ -1739,7 +1937,6 @@ function AddAnimalDialog({
   const [weight, setWeight] =
     useState("");
 
-
   const [saving, setSaving] =
     useState(false);
 
@@ -1777,6 +1974,16 @@ function AddAnimalDialog({
       setGender("Female");
       setBirthDate("");
       setWeight("");
+
+    } catch (err) {
+      /*
+       * Parent already displays the
+       * API error.
+       */
+      console.error(
+        "Add animal error:",
+        err
+      );
 
     } finally {
       setSaving(false);
@@ -1944,8 +2151,7 @@ function AddAnimalDialog({
           onClick={onClose}
           disabled={saving}
           sx={{
-            textTransform:
-              "none",
+            textTransform: "none",
           }}
         >
           Cancel
@@ -1961,13 +2167,13 @@ function AddAnimalDialog({
             !breed.trim()
           }
           sx={{
-            textTransform:
-              "none",
+            textTransform: "none",
             borderRadius: 2,
             fontWeight: 700,
             minWidth: 130,
           }}
         >
+
           {saving ? (
             <CircularProgress
               size={22}
@@ -1976,6 +2182,7 @@ function AddAnimalDialog({
           ) : (
             "Add Animal"
           )}
+
         </Button>
 
       </DialogActions>
@@ -1983,3 +2190,4 @@ function AddAnimalDialog({
     </Dialog>
   );
 }
+

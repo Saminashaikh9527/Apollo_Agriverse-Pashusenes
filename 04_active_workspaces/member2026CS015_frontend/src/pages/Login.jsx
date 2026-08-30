@@ -11,6 +11,10 @@ function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // =========================================================
+  // LOGIN
+  // =========================================================
+
   const handleLogin = async (e) => {
     e.preventDefault();
 
@@ -18,12 +22,19 @@ function Login() {
 
     setError("");
 
-    if (!email.trim()) {
+    const cleanEmail = email.trim();
+    const cleanPassword = password;
+
+    // ---------------------------------------------------------
+    // VALIDATION
+    // ---------------------------------------------------------
+
+    if (!cleanEmail) {
       setError("Please enter your email.");
       return;
     }
 
-    if (!password.trim()) {
+    if (!cleanPassword.trim()) {
       setError("Please enter your password.");
       return;
     }
@@ -31,22 +42,26 @@ function Login() {
     setLoading(true);
 
     try {
-      /*
-       * IMPORTANT
-       *
-       * loginUser expects ONE OBJECT.
-       */
+      console.log("=================================");
+      console.log("LOGIN REQUEST FROM FRONTEND");
+      console.log("EMAIL:", cleanEmail);
+      console.log("=================================");
 
+      // IMPORTANT:
+      // loginUser expects ONE OBJECT
       const data = await loginUser({
-        email: email.trim(),
-        password: password,
+        email: cleanEmail,
+        password: cleanPassword,
       });
 
-      console.log("LOGIN SUCCESS:", data);
+      console.log("=================================");
+      console.log("LOGIN SUCCESS");
+      console.log("DATA:", data);
+      console.log("=================================");
 
-      /* =========================================
-         SAVE LOGIN INFORMATION
-      ========================================= */
+      // -------------------------------------------------------
+      // TOKEN
+      // -------------------------------------------------------
 
       if (data?.access_token) {
         localStorage.setItem(
@@ -60,6 +75,10 @@ function Login() {
         );
       }
 
+      // -------------------------------------------------------
+      // LOGIN STATUS
+      // -------------------------------------------------------
+
       localStorage.setItem(
         "isLoggedIn",
         "true"
@@ -67,8 +86,12 @@ function Login() {
 
       localStorage.setItem(
         "userEmail",
-        email.trim()
+        cleanEmail
       );
+
+      // -------------------------------------------------------
+      // USER
+      // -------------------------------------------------------
 
       if (data?.user) {
         localStorage.setItem(
@@ -77,18 +100,34 @@ function Login() {
         );
       }
 
-      /* =========================================
-         GO TO DASHBOARD
-      ========================================= */
+      // -------------------------------------------------------
+      // DASHBOARD
+      // -------------------------------------------------------
 
       navigate("/dashboard");
 
     } catch (err) {
-      console.error("LOGIN ERROR:", err);
+      console.error(
+        "================================="
+      );
+
+      console.error(
+        "LOGIN ERROR:",
+        err
+      );
+
+      console.error(
+        "MESSAGE:",
+        err?.message
+      );
+
+      console.error(
+        "================================="
+      );
 
       setError(
         err?.message ||
-          "Login failed. Please check your email and password."
+        "Login failed. Please check your email and password."
       );
 
     } finally {
@@ -96,22 +135,28 @@ function Login() {
     }
   };
 
+  // =========================================================
+  // RENDER
+  // =========================================================
+
   return (
     <div style={styles.page}>
 
-      {/* Background */}
+      {/* BACKGROUND */}
+
       <div style={styles.backgroundOverlay} />
 
       <div style={styles.backgroundCircleOne} />
       <div style={styles.backgroundCircleTwo} />
       <div style={styles.backgroundCircleThree} />
 
-      {/* Main */}
+      {/* MAIN CONTAINER */}
+
       <div style={styles.container}>
 
-        {/* =========================================
-            LEFT SIDE
-        ========================================= */}
+        {/* ===================================================
+            LEFT SECTION
+        =================================================== */}
 
         <div style={styles.leftSection}>
 
@@ -153,6 +198,7 @@ function Login() {
           <div style={styles.features}>
 
             <div style={styles.feature}>
+
               <span style={styles.featureIcon}>
                 🌱
               </span>
@@ -160,9 +206,11 @@ function Login() {
               <span>
                 Smart Farm Management
               </span>
+
             </div>
 
             <div style={styles.feature}>
+
               <span style={styles.featureIcon}>
                 🐄
               </span>
@@ -170,9 +218,11 @@ function Login() {
               <span>
                 Livestock Monitoring
               </span>
+
             </div>
 
             <div style={styles.feature}>
+
               <span style={styles.featureIcon}>
                 📊
               </span>
@@ -180,19 +230,22 @@ function Login() {
               <span>
                 Data-Driven Insights
               </span>
+
             </div>
 
           </div>
 
         </div>
 
-        {/* =========================================
-            RIGHT SIDE
-        ========================================= */}
+        {/* ===================================================
+            RIGHT SECTION
+        =================================================== */}
 
         <div style={styles.rightSection}>
 
           <div style={styles.loginCard}>
+
+            {/* LOGIN HEADER */}
 
             <div style={styles.loginHeader}>
 
@@ -209,6 +262,8 @@ function Login() {
               </p>
 
             </div>
+
+            {/* LOGIN FORM */}
 
             <form onSubmit={handleLogin}>
 
@@ -230,9 +285,10 @@ function Login() {
                     type="email"
                     placeholder="Enter your email"
                     value={email}
-                    onChange={(e) =>
-                      setEmail(e.target.value)
-                    }
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setError("");
+                    }}
                     style={styles.input}
                     autoComplete="email"
                     disabled={loading}
@@ -264,9 +320,10 @@ function Login() {
                     }
                     placeholder="Enter your password"
                     value={password}
-                    onChange={(e) =>
-                      setPassword(e.target.value)
-                    }
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      setError("");
+                    }}
                     style={styles.input}
                     autoComplete="current-password"
                     disabled={loading}
@@ -281,6 +338,11 @@ function Login() {
                     }
                     style={styles.passwordButton}
                     disabled={loading}
+                    aria-label={
+                      showPassword
+                        ? "Hide password"
+                        : "Show password"
+                    }
                   >
                     {showPassword
                       ? "🙈"
@@ -332,7 +394,7 @@ function Login() {
 
               </div>
 
-              {/* LOGIN */}
+              {/* SIGN IN */}
 
               <button
                 type="submit"
@@ -362,7 +424,7 @@ function Login() {
 
             </form>
 
-            {/* SECURITY */}
+            {/* DIVIDER */}
 
             <div style={styles.divider}>
 
@@ -375,6 +437,8 @@ function Login() {
               <span style={styles.dividerLine} />
 
             </div>
+
+            {/* SECURITY */}
 
             <div style={styles.security}>
 
@@ -425,9 +489,9 @@ function Login() {
   );
 }
 
-/* =========================================================
+/* ===========================================================
    STYLES
-========================================================= */
+=========================================================== */
 
 const styles = {
 

@@ -1,7 +1,16 @@
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import (
+    APIRouter,
+    File,
+    HTTPException,
+    UploadFile,
+)
+
+from app.ai.pipeline import (
+    run_ai_pipeline,
+)
 
 
 # ============================================================
@@ -17,7 +26,9 @@ router = APIRouter(
 # CONFIGURATION
 # ============================================================
 
-UPLOAD_DIR = Path("uploads/ai")
+UPLOAD_DIR = Path(
+    "uploads/ai"
+)
 
 UPLOAD_DIR.mkdir(
     parents=True,
@@ -25,8 +36,9 @@ UPLOAD_DIR.mkdir(
 )
 
 
-MAX_FILE_SIZE = 10 * 1024 * 1024
-# 10 MB
+MAX_FILE_SIZE = (
+    10 * 1024 * 1024
+)
 
 
 ALLOWED_CONTENT_TYPES = {
@@ -45,29 +57,23 @@ ALLOWED_EXTENSIONS = {
 
 
 # ============================================================
-# AI IMAGE UPLOAD
+# AI IMAGE UPLOAD + ANALYSIS
 # ============================================================
 
 @router.post(
     "/upload",
-    summary="Upload AI Image",
+    summary="Upload and Analyze Animal Image",
     description=(
-        "Upload an animal image for future AI analysis.\n\n"
-        "Current phase:\n"
-        "- validates image type\n"
-        "- validates file size\n"
-        "- stores image locally\n"
-        "- returns upload metadata\n\n"
-        "Future phase:\n"
-        "- YOLO detection\n"
-        "- CNN classification\n"
-        "- AI prediction storage"
+        "Upload an animal image and run "
+        "the AI analysis pipeline."
     ),
 )
 async def upload_ai_image(
     file: UploadFile = File(
         ...,
-        description="Animal image for AI analysis",
+        description=(
+            "Animal image for AI analysis"
+        ),
     ),
 ):
 
@@ -82,14 +88,17 @@ async def upload_ai_image(
             detail="No file name provided.",
         )
 
-
     # ========================================================
-    # VALIDATE EXTENSION
+    # ORIGINAL FILE NAME
     # ========================================================
 
     original_name = Path(
         file.filename
     ).name
+
+    # ========================================================
+    # EXTENSION
+    # ========================================================
 
     extension = Path(
         original_name
@@ -105,12 +114,14 @@ async def upload_ai_image(
             ),
         )
 
-
     # ========================================================
-    # VALIDATE MIME TYPE
+    # MIME TYPE
     # ========================================================
 
-    if file.content_type not in ALLOWED_CONTENT_TYPES:
+    if (
+        file.content_type
+        not in ALLOWED_CONTENT_TYPES
+    ):
 
         raise HTTPException(
             status_code=400,
@@ -120,16 +131,14 @@ async def upload_ai_image(
             ),
         )
 
-
     # ========================================================
     # READ FILE
     # ========================================================
 
     contents = await file.read()
 
-
     # ========================================================
-    # VALIDATE SIZE
+    # FILE SIZE
     # ========================================================
 
     file_size = len(contents)
@@ -141,7 +150,6 @@ async def upload_ai_image(
             detail="Uploaded file is empty.",
         )
 
-
     if file_size > MAX_FILE_SIZE:
 
         raise HTTPException(
@@ -152,9 +160,8 @@ async def upload_ai_image(
             ),
         )
 
-
     # ========================================================
-    # GENERATE SAFE FILE NAME
+    # SAFE FILE NAME
     # ========================================================
 
     generated_name = (
@@ -162,12 +169,12 @@ async def upload_ai_image(
     )
 
     save_path = (
-        UPLOAD_DIR / generated_name
+        UPLOAD_DIR
+        / generated_name
     )
 
-
     # ========================================================
-    # SAVE FILE
+    # SAVE IMAGE
     # ========================================================
 
     try:
@@ -190,6 +197,49 @@ async def upload_ai_image(
             ),
         ) from exc
 
+    # ========================================================
+    # RUN AI PIPELINE
+    # ========================================================
+
+    try:
+
+        analysis = run_ai_pipeline(
+            str(save_path)
+        )
+
+    except Exception as exc:
+
+        return {
+
+            "success": False,
+
+            "message": (
+                "Image uploaded, "
+                "but AI analysis failed."
+            ),
+
+            "filename":
+                original_name,
+
+            "stored_filename":
+                generated_name,
+
+            "content_type":
+                file.content_type,
+
+            "file_size":
+                file_size,
+
+            "path":
+                str(save_path),
+
+            "ai_status":
+                "analysis_failed",
+
+            "error":
+                str(exc),
+
+        }
 
     # ========================================================
     # RESPONSE
@@ -200,29 +250,29 @@ async def upload_ai_image(
         "success": True,
 
         "message": (
-            "Animal image uploaded successfully."
+            "Animal image uploaded "
+            "and analyzed successfully."
         ),
 
-        "filename": original_name,
+        "filename":
+            original_name,
 
-        "stored_filename": generated_name,
+        "stored_filename":
+            generated_name,
 
-        "content_type": file.content_type,
+        "content_type":
+            file.content_type,
 
-        "file_size": file_size,
+        "file_size":
+            file_size,
 
-        "path": str(save_path),
+        "path":
+            str(save_path),
 
-        "ai_status": "uploaded",
+        "ai_status":
+            "analyzed",
 
-        "analysis": {
-
-            "yolo_detection": "pending",
-
-            "cnn_classification": "pending",
-
-            "prediction_storage": "pending",
-
-        },
+        "analysis":
+            analysis,
 
     }

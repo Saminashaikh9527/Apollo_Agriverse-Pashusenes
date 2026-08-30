@@ -1,55 +1,44 @@
 import api from "./axios";
 
-// ============================================================
-// GET ALL GROWTH RECORDS
-// ============================================================
+const getGrowthRecords = async (animalId = null) => {
+  const url = animalId
+    ? `/api/growth/?animal_id=${animalId}`
+    : `/api/growth/`;
 
-export async function getGrowthRecords() {
-  const response = await api.get("/growth/");
+  const response = await api.get(url);
   return response.data;
-}
+};
 
-// ============================================================
-// GET SINGLE GROWTH RECORD
-// ============================================================
-
-export async function getGrowthRecord(growthId) {
-  const response = await api.get(`/growth/${growthId}`);
+const getGrowthRecord = async (id) => {
+  const response = await api.get(`/api/growth/${id}`);
   return response.data;
-}
+};
 
-// ============================================================
-// CREATE GROWTH RECORD
-// ============================================================
-
-export async function createGrowthRecord(growthData) {
-  const response = await api.post("/growth/", growthData);
+const createGrowthRecord = async (data) => {
+  const response = await api.post("/api/growth/", data);
   return response.data;
-}
+};
 
-// ============================================================
-// UPDATE GROWTH RECORD
-// ============================================================
-
-export async function updateGrowthRecord(growthId, growthData) {
-  const response = await api.put(`/growth/${growthId}`, growthData);
+const updateGrowthRecord = async (id, data) => {
+  const response = await api.put(`/api/growth/${id}`, data);
   return response.data;
-}
+};
 
-// ============================================================
-// PATCH GROWTH RECORD
-// ============================================================
-
-export async function patchGrowthRecord(growthId, growthData) {
-  const response = await api.patch(`/growth/${growthId}`, growthData);
+const patchGrowthRecord = async (id, data) => {
+  const response = await api.patch(`/api/growth/${id}`, data);
   return response.data;
-}
+};
 
-// ============================================================
-// DELETE GROWTH RECORD
-// ============================================================
-
-export async function deleteGrowthRecord(growthId) {
-  const response = await api.delete(`/growth/${growthId}`);
+const deleteGrowthRecord = async (id) => {
+  const response = await api.delete(`/api/growth/${id}`);
   return response.data;
-}
+};
+
+export {
+  getGrowthRecords,
+  getGrowthRecord,
+  createGrowthRecord,
+  updateGrowthRecord,
+  patchGrowthRecord,
+  deleteGrowthRecord,
+};

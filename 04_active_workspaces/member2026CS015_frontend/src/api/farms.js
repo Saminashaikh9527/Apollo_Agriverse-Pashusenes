@@ -1,49 +1,55 @@
+
 import api from "./axios";
 
 // ============================================================
 // GET ALL FARMS
 // ============================================================
 
-export async function getFarms() {
-  const response = await api.get("/farms/");
+export const getFarms = async () => {
+  const response = await api.get("/api/farms/");
   return response.data;
-}
+};
 
 // ============================================================
 // GET SINGLE FARM
 // ============================================================
 
-export async function getFarm(farmId) {
-  const response = await api.get(`/farms/${farmId}`);
+export const getFarm = async (farmId) => {
+  const response = await api.get(`/api/farms/${farmId}`);
   return response.data;
-}
+};
 
 // ============================================================
 // CREATE FARM
 // ============================================================
 
-export async function createFarm(farmData) {
-  const response = await api.post("/farms/", farmData);
+export const createFarm = async (data) => {
+  const response = await api.post("/api/farms/", data);
   return response.data;
-}
+};
 
 // ============================================================
 // UPDATE FARM
 // ============================================================
 
-export async function updateFarm(farmId, farmData) {
+export const updateFarm = async (farmId, data) => {
   const response = await api.put(
-    `/farms/${farmId}`,
-    farmData
+    `/api/farms/${farmId}`,
+    data
   );
+
   return response.data;
-}
+};
 
 // ============================================================
 // DELETE FARM
 // ============================================================
 
-export async function deleteFarm(farmId) {
-  const response = await api.delete(`/farms/${farmId}`);
+export const deleteFarm = async (farmId) => {
+  const response = await api.delete(
+    `/api/farms/{farmId}`
+  );
+
   return response.data;
-}
+};
+

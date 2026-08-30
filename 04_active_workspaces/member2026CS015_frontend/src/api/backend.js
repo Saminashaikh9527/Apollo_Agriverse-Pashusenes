@@ -1,58 +1,221 @@
-const API_BASE_URL = "http://127.0.0.1:8000";
 
-/* =========================================================
-   COMMON API REQUEST
-========================================================= */
+// ============================================================
+// src/api/backend.js
+// Apollo AgriVerse - PashuSense
+// CENTRAL FRONTEND BACKEND API
+// ============================================================
 
-async function apiRequest(endpoint, options = {}) {
-  const token =
+import axios from "axios";
+
+// ============================================================
+// API CONFIG
+// ============================================================
+
+export const API_BASE_URL = "http://127.0.0.1:8000";
+
+// ============================================================
+// AXIOS INSTANCE
+// ============================================================
+
+export const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 30000,
+  headers: {
+    Accept: "application/json",
+  },
+});
+
+// ============================================================
+// AUTH TOKEN HELPERS
+// ============================================================
+
+export function getAuthToken() {
+  return (
     localStorage.getItem("access_token") ||
     localStorage.getItem("token") ||
     localStorage.getItem("authToken") ||
-    "";
+    ""
+  ).trim();
+}
+
+export function saveAuthToken(token) {
+  if (!token) return;
+
+  const cleanToken = String(token).trim();
+
+  if (!cleanToken) return;
+
+  localStorage.setItem("access_token", cleanToken);
+  localStorage.setItem("token", cleanToken);
+  localStorage.setItem("authToken", cleanToken);
+}
+
+export function clearAuthToken() {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("token");
+  localStorage.removeItem("authToken");
+  localStorage.removeItem("isLoggedIn");
+  localStorage.removeItem("user");
+  localStorage.removeItem("userEmail");
+}
+
+// ============================================================
+// AXIOS REQUEST INTERCEPTOR
+// ============================================================
+
+api.interceptors.request.use(
+  (config) => {
+    config.headers = config.headers || {};
+
+    config.headers.Accept = "application/json";
+
+    const token = getAuthToken();
+
+    // Never send an empty Authorization header.
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      delete config.headers.Authorization;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// ============================================================
+// AXIOS RESPONSE INTERCEPTOR
+// ============================================================
+
+api.interceptors.response.use(
+  (response) => response,
+
+  (error) => {
+    const status = error?.response?.status;
+
+    if (status === 401) {
+      console.warn(
+        "401 Unauthorized:",
+        error?.config?.url
+      );
+
+      /*
+       * Do not automatically redirect here.
+       *
+       * Login itself can return 401.
+       * Automatically clearing the token here can also
+       * create redirect loops.
+       */
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+// ============================================================
+// COMMON ERROR MESSAGE
+// ============================================================
+
+export function getApiErrorMessage(error) {
+  const data = error?.response?.data;
+
+  if (typeof data === "string" && data.trim()) {
+    return data.trim();
+  }
+
+  if (data?.detail) {
+    if (Array.isArray(data.detail)) {
+      return data.detail
+        .map(
+          (item) =>
+            item?.msg ||
+            item?.message ||
+            String(item)
+        )
+        .join(", ");
+    }
+
+    return String(data.detail);
+  }
+
+  if (data?.message) {
+    return String(data.message);
+  }
+
+  if (error?.message) {
+    return error.message;
+  }
+
+  return "Request failed.";
+}
+
+// ============================================================
+// GENERIC API REQUEST
+// ============================================================
+
+export async function apiRequest(
+  endpoint,
+  options = {}
+) {
+  const method = String(
+    options.method || "GET"
+  ).toUpperCase();
+
+  const url = endpoint.startsWith("http")
+    ? endpoint
+    : `${API_BASE_URL}${endpoint}`;
+
+  const token = getAuthToken();
 
   const headers = {
     Accept: "application/json",
-    ...(options.body
-      ? {
-          "Content-Type": "application/json",
-        }
-      : {}),
-    ...(token
-      ? {
-          Authorization: `Bearer ${token}`,
-        }
-      : {}),
     ...(options.headers || {}),
   };
 
-  const url = `${API_BASE_URL}${endpoint}`;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  } else {
+    delete headers.Authorization;
+  }
 
-  console.log("=================================");
-  console.log("API REQUEST");
-  console.log("URL:", url);
-  console.log("METHOD:", options.method || "GET");
-  console.log("=================================");
+  const body = options.body;
+
+  if (
+    body !== undefined &&
+    body !== null &&
+    !(body instanceof FormData) &&
+    !headers["Content-Type"]
+  ) {
+    headers["Content-Type"] =
+      "application/json";
+  }
 
   try {
     const response = await fetch(url, {
-      ...options,
+      method,
       headers,
+      body,
     });
+
+    const contentType =
+      response.headers.get(
+        "content-type"
+      ) || "";
 
     let data = null;
 
-    try {
+    if (
+      contentType.includes(
+        "application/json"
+      )
+    ) {
       data = await response.json();
-    } catch {
-      data = null;
-    }
+    } else {
+      const text =
+        await response.text();
 
-    console.log("=================================");
-    console.log("API RESPONSE");
-    console.log("STATUS:", response.status);
-    console.log("DATA:", data);
-    console.log("=================================");
+      data = text || null;
+    }
 
     if (!response.ok) {
       const message =
@@ -60,103 +223,169 @@ async function apiRequest(endpoint, options = {}) {
         data?.message ||
         `Request failed with status ${response.status}`;
 
-      throw new Error(
-        typeof message === "string"
+      const error = new Error(
+        Array.isArray(message)
           ? message
-          : JSON.stringify(message)
+              .map(
+                (item) =>
+                  item?.msg ||
+                  item?.message ||
+                  String(item)
+              )
+              .join(", ")
+          : String(message)
       );
+
+      error.status = response.status;
+
+      error.response = {
+        status: response.status,
+        data,
+      };
+
+      throw error;
     }
 
     return data;
   } catch (error) {
-    console.error("API ERROR:", error);
+    console.error(
+      `API REQUEST ERROR: ${method} ${url}`,
+      error
+    );
+
     throw error;
   }
 }
 
-/* =========================================================
-   AUTHENTICATION
-========================================================= */
+// ============================================================
+// AUTHENTICATION
+// ============================================================
 
-/*
- * Login.jsx calls:
- *
- * loginUser({
- *   email: "...",
- *   password: "..."
- * })
- */
+// ============================================================
+// REGISTER
+// ============================================================
 
-export async function loginUser(credentials) {
-  console.log("=================================");
-  console.log("LOGIN FUNCTION CALLED");
-  console.log("=================================");
-
-  if (
-    !credentials ||
-    typeof credentials !== "object" ||
-    Array.isArray(credentials)
-  ) {
-    throw new Error(
-      "Login data must be an object containing email and password."
-    );
-  }
+export async function registerUser(userData) {
+  const name = String(
+    userData?.name ||
+      userData?.full_name ||
+      ""
+  ).trim();
 
   const email = String(
-    credentials.email || ""
+    userData?.email || ""
   ).trim();
 
   const password = String(
-    credentials.password || ""
+    userData?.password || ""
   );
 
+  const role = String(
+    userData?.role || "farmer"
+  ).trim();
+
+  if (!name) {
+    throw new Error("Name is required.");
+  }
+
   if (!email) {
-    throw new Error("Email address is required.");
+    throw new Error("Email is required.");
   }
 
   if (!password) {
     throw new Error("Password is required.");
   }
 
-  const payload = {
-    email,
-    password,
-  };
-
-  console.log("LOGIN PAYLOAD:", {
-    email,
-    password: "********",
-  });
-
-  /*
-   * CONFIRMED FROM YOUR FASTAPI SWAGGER:
-   *
-   * POST /api/auth/login
-   */
-
-  const data = await apiRequest(
-    "/api/auth/login",
-    {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }
-  );
-
-  console.log("LOGIN SUCCESS:", data);
-
-  /* =====================================================
-     SAVE JWT
-  ===================================================== */
-
-  if (data?.access_token) {
-    localStorage.setItem(
-      "access_token",
-      data.access_token
+  try {
+    const response = await api.post(
+      "/api/auth/register",
+      {
+        name,
+        email,
+        password,
+        role,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
     );
 
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      getApiErrorMessage(error)
+    );
+  }
+}
+
+// ============================================================
+// LOGIN
+// ============================================================
+
+export async function loginUser(credentials) {
+  const email = String(
+    credentials?.email || ""
+  ).trim();
+
+  const password = String(
+    credentials?.password || ""
+  );
+
+  if (!email) {
+    throw new Error("Email is required.");
+  }
+
+  if (!password) {
+    throw new Error("Password is required.");
+  }
+
+  try {
+    const response = await api.post(
+      "/api/auth/login",
+      {
+        email,
+        password,
+      },
+      {
+        headers: {
+          "Content-Type":
+            "application/json",
+          Accept: "application/json",
+        },
+      }
+    );
+
+    const data = response.data;
+
+    // --------------------------------------------------------
+    // SAVE TOKEN
+    // --------------------------------------------------------
+
+    const token =
+      data?.access_token ||
+      data?.token ||
+      data?.accessToken;
+
+    if (token) {
+      saveAuthToken(token);
+    }
+
+    // --------------------------------------------------------
+    // SAVE USER
+    // --------------------------------------------------------
+
+    if (data?.user) {
+      localStorage.setItem(
+        "user",
+        JSON.stringify(data.user)
+      );
+    }
+
     localStorage.setItem(
-      "token",
-      data.access_token
+      "userEmail",
+      email
     );
 
     localStorage.setItem(
@@ -164,625 +393,1218 @@ export async function loginUser(credentials) {
       "true"
     );
 
-    localStorage.setItem(
-      "userEmail",
-      email
-    );
-  }
-
-  /* =====================================================
-     SAVE USER
-  ===================================================== */
-
-  if (data?.user) {
-    localStorage.setItem(
-      "user",
-      JSON.stringify(data.user)
-    );
-  }
-
-  return data;
-}
-
-/* =========================================================
-   REGISTER
-========================================================= */
-
-export async function registerUser(userData) {
-  console.log("REGISTER PAYLOAD:", userData);
-
-  /*
-   * CONFIRMED FROM FASTAPI SWAGGER:
-   *
-   * POST /api/auth/register
-   */
-
-  return apiRequest(
-    "/api/auth/register",
-    {
-      method: "POST",
-      body: JSON.stringify(userData),
+    return data;
+  } catch (error) {
+    if (
+      error?.response?.status === 401
+    ) {
+      throw new Error(
+        error?.response?.data?.detail ||
+          "Invalid email or password."
+      );
     }
-  );
+
+    throw new Error(
+      getApiErrorMessage(error)
+    );
+  }
 }
 
-/* =========================================================
-   LOGOUT
-========================================================= */
+// ============================================================
+// LOGOUT
+// ============================================================
 
 export function logoutUser() {
-  localStorage.removeItem(
-    "access_token"
-  );
+  clearAuthToken();
 
-  localStorage.removeItem(
-    "token"
-  );
-
-  localStorage.removeItem(
-    "authToken"
-  );
-
-  localStorage.removeItem(
-    "isLoggedIn"
-  );
-
-  localStorage.removeItem(
-    "userEmail"
-  );
-
-  localStorage.removeItem(
-    "user"
-  );
+  window.location.href = "/login";
 }
 
-/* =========================================================
-   BACKEND TEST
-========================================================= */
+// ============================================================
+// CURRENT USER
+// ============================================================
 
-export async function testBackendConnection() {
-  return apiRequest(
-    "/database-test"
-  );
+export async function getCurrentUser() {
+  try {
+    const response = await api.get(
+      "/api/auth/me"
+    );
+
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      getApiErrorMessage(error)
+    );
+  }
 }
 
-/* =========================================================
-   FARMS
-========================================================= */
+// ============================================================
+// FARMS
+// ============================================================
 
 export async function getFarms() {
-  return apiRequest(
+  const response = await api.get(
     "/api/farms/"
   );
+
+  return response.data;
 }
 
 export async function getFarm(farmId) {
-  return apiRequest(
-    `/api/farms/${farmId}`
+  if (
+    farmId === null ||
+    farmId === undefined ||
+    String(farmId).trim() === ""
+  ) {
+    throw new Error("Farm ID is required.");
+  }
+
+  const response = await api.get(
+    `/api/farms/${encodeURIComponent(
+      farmId
+    )}`
   );
+
+  return response.data;
 }
 
-export async function createFarm(farmData) {
-  return apiRequest(
-    "/api/farms/",
-    {
-      method: "POST",
-      body: JSON.stringify(farmData),
-    }
-  );
-}
+// ============================================================
+// ANIMALS
+// ============================================================
 
-export async function updateFarm(
-  farmId,
-  farmData
+export async function getAnimals(
+  farmId = null
 ) {
-  return apiRequest(
-    `/api/farms/${farmId}`,
-    {
-      method: "PUT",
-      body: JSON.stringify(farmData),
-    }
-  );
+  const url =
+    farmId !== null &&
+    farmId !== undefined &&
+    String(farmId).trim() !== ""
+      ? `/api/animals/?farm_id=${encodeURIComponent(
+          farmId
+        )}`
+      : "/api/animals/";
+
+  const response = await api.get(url);
+
+  return response.data;
 }
 
-export async function deleteFarm(farmId) {
-  return apiRequest(
-    `/api/farms/${farmId}`,
-    {
-      method: "DELETE",
-    }
-  );
-}
+export async function getFarmAnimals(
+  farmId = null
+) {
+  const response =
+    await getAnimals(farmId);
 
-/* =========================================================
-   ANIMALS
-========================================================= */
+  if (Array.isArray(response)) {
+    return response;
+  }
 
-export async function getAnimals() {
-  return apiRequest(
-    "/api/animals/"
-  );
+  if (
+    Array.isArray(response?.animals)
+  ) {
+    return response.animals;
+  }
+
+  if (
+    Array.isArray(response?.data)
+  ) {
+    return response.data;
+  }
+
+  return [];
 }
 
 export async function getAnimal(animalId) {
-  return apiRequest(
-    `/api/animals/${animalId}`
+  if (
+    animalId === null ||
+    animalId === undefined ||
+    String(animalId).trim() === ""
+  ) {
+    throw new Error("Animal ID is required.");
+  }
+
+  const response = await api.get(
+    `/api/animals/${encodeURIComponent(
+      animalId
+    )}`
   );
+
+  return response.data;
 }
 
-export async function createAnimal(animalData) {
-  return apiRequest(
+export async function createAnimal(
+  animalData
+) {
+  const response = await api.post(
     "/api/animals/",
-    {
-      method: "POST",
-      body: JSON.stringify(animalData),
-    }
+    animalData
   );
+
+  return response.data;
 }
 
 export async function updateAnimal(
   animalId,
   animalData
 ) {
-  return apiRequest(
-    `/api/animals/${animalId}`,
-    {
-      method: "PUT",
-      body: JSON.stringify(animalData),
-    }
+  const response = await api.put(
+    `/api/animals/${encodeURIComponent(
+      animalId
+    )}`,
+    animalData
   );
+
+  return response.data;
 }
 
-export async function deleteAnimal(animalId) {
-  return apiRequest(
-    `/api/animals/${animalId}`,
-    {
-      method: "DELETE",
-    }
-  );
-}
-
-/* =========================================================
-   ANIMAL HEALTH
-========================================================= */
-
-export async function getHealthRecords() {
-  return apiRequest(
-    "/api/health/"
-  );
-}
-
-export async function getHealthRecord(
-  healthRecordId
+export async function patchAnimal(
+  animalId,
+  animalData
 ) {
-  return apiRequest(
-    `/api/health/${healthRecordId}`
+  const response = await api.patch(
+    `/api/animals/${encodeURIComponent(
+      animalId
+    )}`,
+    animalData
   );
+
+  return response.data;
 }
 
-export async function createHealthRecord(data) {
-  return apiRequest(
-    "/api/health/",
-    {
-      method: "POST",
-      body: JSON.stringify(data),
-    }
+export async function deleteAnimal(
+  animalId
+) {
+  const response = await api.delete(
+    `/api/animals/${encodeURIComponent(
+      animalId
+    )}`
   );
+
+  return response.data;
+}
+
+// ============================================================
+// HEALTH
+// ============================================================
+
+export async function getHealthRecords(
+  animalId = null
+) {
+  const url =
+    animalId !== null &&
+    animalId !== undefined &&
+    String(animalId).trim() !== ""
+      ? `/api/health/?animal_id=${encodeURIComponent(
+          animalId
+        )}`
+      : "/api/health/";
+
+  const response = await api.get(url);
+
+  return response.data;
+}
+
+export async function getHealthRecord(id) {
+  const response = await api.get(
+    `/api/health/${encodeURIComponent(id)}`
+  );
+
+  return response.data;
+}
+
+export async function createHealthRecord(
+  data
+) {
+  const response = await api.post(
+    "/api/health/",
+    data
+  );
+
+  return response.data;
 }
 
 export async function updateHealthRecord(
-  healthRecordId,
+  id,
   data
 ) {
-  return apiRequest(
-    `/api/health/${healthRecordId}`,
-    {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    }
+  const response = await api.put(
+    `/api/health/${encodeURIComponent(id)}`,
+    data
   );
+
+  return response.data;
+}
+
+export async function patchHealthRecord(
+  id,
+  data
+) {
+  const response = await api.patch(
+    `/api/health/${encodeURIComponent(id)}`,
+    data
+  );
+
+  return response.data;
 }
 
 export async function deleteHealthRecord(
-  healthRecordId
+  id
 ) {
-  return apiRequest(
-    `/api/health/${healthRecordId}`,
-    {
-      method: "DELETE",
-    }
+  const response = await api.delete(
+    `/api/health/${encodeURIComponent(id)}`
   );
+
+  return response.data;
 }
 
-/* =========================================================
-   MILK PRODUCTION
-========================================================= */
+// ============================================================
+// MILK
+// ============================================================
 
-export async function getMilkRecords() {
-  return apiRequest(
-    "/api/milk/"
-  );
+export async function getMilkRecords(
+  animalId = null
+) {
+  const url =
+    animalId !== null &&
+    animalId !== undefined &&
+    String(animalId).trim() !== ""
+      ? `/api/milk/?animal_id=${encodeURIComponent(
+          animalId
+        )}`
+      : "/api/milk/";
+
+  const response = await api.get(url);
+
+  return response.data;
 }
 
-export async function getMilkRecord(milkId) {
-  return apiRequest(
-    `/api/milk/${milkId}`
+export async function getMilkRecord(id) {
+  const response = await api.get(
+    `/api/milk/${encodeURIComponent(id)}`
   );
+
+  return response.data;
 }
 
-export async function createMilkRecord(data) {
-  return apiRequest(
+export async function createMilkRecord(
+  data
+) {
+  const response = await api.post(
     "/api/milk/",
-    {
-      method: "POST",
-      body: JSON.stringify(data),
-    }
+    data
   );
+
+  return response.data;
 }
 
 export async function updateMilkRecord(
-  milkId,
+  id,
   data
 ) {
-  return apiRequest(
-    `/api/milk/${milkId}`,
-    {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }
+  const response = await api.put(
+    `/api/milk/${encodeURIComponent(id)}`,
+    data
   );
+
+  return response.data;
 }
 
-export async function deleteMilkRecord(milkId) {
-  return apiRequest(
-    `/api/milk/${milkId}`,
-    {
-      method: "DELETE",
-    }
-  );
-}
-
-/* =========================================================
-   WOOL
-========================================================= */
-
-export async function getWoolRecords() {
-  return apiRequest(
-    "/api/wool/"
-  );
-}
-
-export async function getWoolRecord(
-  woolRecordId
+export async function patchMilkRecord(
+  id,
+  data
 ) {
-  return apiRequest(
-    `/api/wool/${woolRecordId}`
+  const response = await api.patch(
+    `/api/milk/${encodeURIComponent(id)}`,
+    data
   );
+
+  return response.data;
+}
+
+export async function deleteMilkRecord(id) {
+  const response = await api.delete(
+    `/api/milk/${encodeURIComponent(id)}`
+  );
+
+  return response.data;
+}
+
+// ============================================================
+// FEED
+// ============================================================
+
+export async function getFeedRecords(
+  animalId = null
+) {
+  const url =
+    animalId !== null &&
+    animalId !== undefined &&
+    String(animalId).trim() !== ""
+      ? `/api/feed/?animal_id=${encodeURIComponent(
+          animalId
+        )}`
+      : "/api/feed/";
+
+  const response = await api.get(url);
+
+  return response.data;
+}
+
+export async function getFeedRecord(id) {
+  const response = await api.get(
+    `/api/feed/${encodeURIComponent(id)}`
+  );
+
+  return response.data;
+}
+
+export async function createFeedRecord(
+  data
+) {
+  const response = await api.post(
+    "/api/feed/",
+    data
+  );
+
+  return response.data;
+}
+
+export async function updateFeedRecord(
+  id,
+  data
+) {
+  const response = await api.put(
+    `/api/feed/${encodeURIComponent(id)}`,
+    data
+  );
+
+  return response.data;
+}
+
+export async function patchFeedRecord(
+  id,
+  data
+) {
+  const response = await api.patch(
+    `/api/feed/${encodeURIComponent(id)}`,
+    data
+  );
+
+  return response.data;
+}
+
+export async function deleteFeedRecord(id) {
+  const response = await api.delete(
+    `/api/feed/${encodeURIComponent(id)}`
+  );
+
+  return response.data;
+}
+
+// ============================================================
+// EGG
+// ============================================================
+
+export async function getEggRecords(
+  animalId = null
+) {
+  const url =
+    animalId !== null &&
+    animalId !== undefined &&
+    String(animalId).trim() !== ""
+      ? `/api/egg/?animal_id=${encodeURIComponent(
+          animalId
+        )}`
+      : "/api/egg/";
+
+  const response = await api.get(url);
+
+  return response.data;
+}
+
+export async function getEggRecord(id) {
+  const response = await api.get(
+    `/api/egg/${encodeURIComponent(id)}`
+  );
+
+  return response.data;
+}
+
+export async function createEggRecord(data) {
+  const response = await api.post(
+    "/api/egg/",
+    data
+  );
+
+  return response.data;
+}
+
+export async function updateEggRecord(
+  id,
+  data
+) {
+  const response = await api.put(
+    `/api/egg/${encodeURIComponent(id)}`,
+    data
+  );
+
+  return response.data;
+}
+
+export async function patchEggRecord(
+  id,
+  data
+) {
+  const response = await api.patch(
+    `/api/egg/${encodeURIComponent(id)}`,
+    data
+  );
+
+  return response.data;
+}
+
+export async function deleteEggRecord(id) {
+  const response = await api.delete(
+    `/api/egg/${encodeURIComponent(id)}`
+  );
+
+  return response.data;
+}
+
+// ============================================================
+// WOOL
+// ============================================================
+
+export async function getWoolRecords(
+  animalId = null
+) {
+  const url =
+    animalId !== null &&
+    animalId !== undefined &&
+    String(animalId).trim() !== ""
+      ? `/api/wool/?animal_id=${encodeURIComponent(
+          animalId
+        )}`
+      : "/api/wool/";
+
+  const response = await api.get(url);
+
+  return response.data;
+}
+
+export async function getWoolRecord(id) {
+  const response = await api.get(
+    `/api/wool/${encodeURIComponent(id)}`
+  );
+
+  return response.data;
 }
 
 export async function createWoolRecord(data) {
-  return apiRequest(
+  const response = await api.post(
     "/api/wool/",
-    {
-      method: "POST",
-      body: JSON.stringify(data),
-    }
+    data
   );
+
+  return response.data;
 }
 
 export async function updateWoolRecord(
-  woolRecordId,
+  id,
   data
 ) {
-  return apiRequest(
-    `/api/wool/${woolRecordId}`,
-    {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    }
+  const response = await api.put(
+    `/api/wool/${encodeURIComponent(id)}`,
+    data
   );
+
+  return response.data;
 }
 
-export async function deleteWoolRecord(
-  woolRecordId
+export async function patchWoolRecord(
+  id,
+  data
 ) {
-  return apiRequest(
-    `/api/wool/${woolRecordId}`,
-    {
-      method: "DELETE",
-    }
+  const response = await api.patch(
+    `/api/wool/${encodeURIComponent(id)}`,
+    data
   );
+
+  return response.data;
 }
 
-/* =========================================================
-   VACCINATION
-========================================================= */
-
-export async function getVaccinationRecords() {
-  return apiRequest(
-    "/api/vaccination/"
+export async function deleteWoolRecord(id) {
+  const response = await api.delete(
+    `/api/wool/${encodeURIComponent(id)}`
   );
+
+  return response.data;
 }
 
-export async function getVaccinationRecord(
-  vaccinationId
+// ============================================================
+// VACCINATION
+// ============================================================
+
+export async function getVaccinationRecords(
+  animalId = null
 ) {
-  return apiRequest(
-    `/api/vaccination/${vaccinationId}`
+  const url =
+    animalId !== null &&
+    animalId !== undefined &&
+    String(animalId).trim() !== ""
+      ? `/api/vaccination/?animal_id=${encodeURIComponent(
+          animalId
+        )}`
+      : "/api/vaccination/";
+
+  const response = await api.get(url);
+
+  return response.data;
+}
+
+export async function getVaccinationRecord(id) {
+  const response = await api.get(
+    `/api/vaccination/${encodeURIComponent(id)}`
   );
+
+  return response.data;
 }
 
 export async function createVaccinationRecord(
   data
 ) {
-  return apiRequest(
+  const response = await api.post(
     "/api/vaccination/",
-    {
-      method: "POST",
-      body: JSON.stringify(data),
-    }
+    data
   );
+
+  return response.data;
 }
 
 export async function updateVaccinationRecord(
-  vaccinationId,
+  id,
   data
 ) {
-  return apiRequest(
-    `/api/vaccination/${vaccinationId}`,
-    {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    }
+  const response = await api.put(
+    `/api/vaccination/${encodeURIComponent(id)}`,
+    data
   );
+
+  return response.data;
+}
+
+export async function patchVaccinationRecord(
+  id,
+  data
+) {
+  const response = await api.patch(
+    `/api/vaccination/${encodeURIComponent(id)}`,
+    data
+  );
+
+  return response.data;
 }
 
 export async function deleteVaccinationRecord(
-  vaccinationId
+  id
 ) {
-  return apiRequest(
-    `/api/vaccination/${vaccinationId}`,
-    {
-      method: "DELETE",
-    }
+  const response = await api.delete(
+    `/api/vaccination/${encodeURIComponent(id)}`
   );
+
+  return response.data;
 }
 
-/* =========================================================
-   FEED
-========================================================= */
+// ============================================================
+// PREDICTIONS DATABASE
+// ============================================================
 
-export async function getFeedRecords() {
-  return apiRequest(
-    "/api/feed/"
+export async function getPredictions() {
+  const response = await api.get(
+    "/api/predictions/"
   );
+
+  return response.data;
 }
 
-export async function getFeedRecord(feedId) {
-  return apiRequest(
-    `/api/feed/${feedId}`
+export async function getPrediction(id) {
+  const response = await api.get(
+    `/api/predictions/${encodeURIComponent(id)}`
   );
+
+  return response.data;
 }
 
-export async function createFeedRecord(data) {
-  return apiRequest(
-    "/api/feed/",
-    {
-      method: "POST",
-      body: JSON.stringify(data),
-    }
+export async function createPrediction(data) {
+  const response = await api.post(
+    "/api/predictions/",
+    data
   );
+
+  return response.data;
 }
 
-export async function updateFeedRecord(
-  feedId,
+export async function updatePrediction(
+  id,
   data
 ) {
-  return apiRequest(
-    `/api/feed/${feedId}`,
-    {
-      method: "PATCH",
-      body: JSON.stringify(data),
+  const response = await api.put(
+    `/api/predictions/${encodeURIComponent(id)}`,
+    data
+  );
+
+  return response.data;
+}
+
+export async function deletePrediction(id) {
+  const response = await api.delete(
+    `/api/predictions/${encodeURIComponent(id)}`
+  );
+
+  return response.data;
+}
+
+// ============================================================
+// ML MODELS
+// ============================================================
+
+export async function getMLModels() {
+  const endpoints = [
+    "/api/ml-predictions/models",
+    "/api/ml-predictions/models/",
+    "/api/predictions/models",
+    "/api/predictions/models/",
+    "/api/ml/models",
+    "/api/ml/models/",
+  ];
+
+  let lastError = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      const response =
+        await api.get(endpoint);
+
+      return response.data;
+    } catch (error) {
+      lastError = error;
+
+      if (
+        error?.response?.status === 404
+      ) {
+        continue;
+      }
+
+      throw error;
     }
+  }
+
+  throw (
+    lastError ||
+    new Error(
+      "ML models endpoint not found."
+    )
   );
 }
 
-export async function replaceFeedRecord(
-  feedId,
-  data
+// ============================================================
+// GET ALL ML FEATURES
+// ============================================================
+
+export async function getMLFeatures() {
+  try {
+    const response =
+      await api.get(
+        "/api/ml-predictions/features"
+      );
+
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      getApiErrorMessage(error)
+    );
+  }
+}
+
+// ============================================================
+// GET FEATURES FOR ONE MODEL
+// ============================================================
+
+export async function getMLModelFeatures(
+  modelName
 ) {
-  return apiRequest(
-    `/api/feed/${feedId}`,
-    {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }
-  );
+  if (
+    !modelName ||
+    String(modelName).trim() === ""
+  ) {
+    throw new Error(
+      "ML model name is required."
+    );
+  }
+
+  const cleanModelName =
+    String(modelName).trim();
+
+  try {
+    const response =
+      await api.get(
+        `/api/ml-predictions/features/${encodeURIComponent(
+          cleanModelName
+        )}`
+      );
+
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      getApiErrorMessage(error)
+    );
+  }
 }
 
-export async function deleteFeedRecord(feedId) {
-  return apiRequest(
-    `/api/feed/${feedId}`,
-    {
-      method: "DELETE",
-    }
-  );
+// ============================================================
+// ML STATUS
+// ============================================================
+
+export async function getMLStatus() {
+  try {
+    const response =
+      await api.get(
+        "/api/ml-predictions/status"
+      );
+
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      getApiErrorMessage(error)
+    );
+  }
 }
 
-/* =========================================================
-   EGG
-========================================================= */
+// ============================================================
+// LOADED MODELS
+// ============================================================
 
-export async function getEggRecords() {
-  return apiRequest(
-    "/api/egg/"
-  );
+export async function getLoadedMLModels() {
+  try {
+    const response =
+      await api.get(
+        "/api/ml-predictions/loaded-models"
+      );
+
+    return response.data;
+  } catch (error) {
+    throw new Error(
+      getApiErrorMessage(error)
+    );
+  }
 }
 
-export async function getEggRecord(eggId) {
-  return apiRequest(
-    `/api/egg/${eggId}`
-  );
-}
+// ============================================================
+// PRODUCTION / ML PREDICTION
+// ============================================================
+//
+// IMPORTANT
+//
+// NO animal_id is sent.
+//
+// Frontend sends:
+//
+// {
+//   model_name: "milk",
+//   data: {
+//     Index: 1,
+//     "Days In Milk": 120,
+//     "Lactation Number": 2
+//   }
+// }
+//
+// ============================================================
 
-export async function createEggRecord(data) {
-  return apiRequest(
-    "/api/egg/",
-    {
-      method: "POST",
-      body: JSON.stringify(data),
-    }
-  );
-}
-
-export async function updateEggRecord(
-  eggId,
-  data
+export async function predictProduction(
+  modelName,
+  features = {}
 ) {
-  return apiRequest(
-    `/api/egg/${eggId}`,
-    {
-      method: "PUT",
-      body: JSON.stringify(data),
+  // ----------------------------------------------------------
+  // MODEL
+  // ----------------------------------------------------------
+
+  if (
+    !modelName ||
+    String(modelName).trim() === ""
+  ) {
+    throw new Error(
+      "ML model name is required."
+    );
+  }
+
+  const cleanModelName =
+    String(modelName).trim();
+
+  // ----------------------------------------------------------
+  // FEATURES MUST BE OBJECT
+  // ----------------------------------------------------------
+
+  if (
+    features === null ||
+    typeof features !== "object" ||
+    Array.isArray(features)
+  ) {
+    throw new Error(
+      "Prediction features must be an object."
+    );
+  }
+
+  // ----------------------------------------------------------
+  // COPY FEATURES
+  // ----------------------------------------------------------
+
+  const predictionFeatures = {
+    ...features,
+  };
+
+  // ----------------------------------------------------------
+  // NEVER SEND ANIMAL ID
+  // ----------------------------------------------------------
+
+  delete predictionFeatures.animal_id;
+  delete predictionFeatures.animalId;
+  delete predictionFeatures.animalID;
+  delete predictionFeatures.Animal_ID;
+  delete predictionFeatures["Animal ID"];
+
+  // ----------------------------------------------------------
+  // REMOVE EMPTY VALUES
+  // ----------------------------------------------------------
+
+  Object.keys(
+    predictionFeatures
+  ).forEach((key) => {
+    const value =
+      predictionFeatures[key];
+
+    if (
+      value === undefined ||
+      value === null ||
+      String(value).trim() === ""
+    ) {
+      delete predictionFeatures[key];
     }
+  });
+
+  // ----------------------------------------------------------
+  // REQUIRE AT LEAST ONE FEATURE
+  // ----------------------------------------------------------
+
+  if (
+    Object.keys(
+      predictionFeatures
+    ).length === 0
+  ) {
+    throw new Error(
+      "Please enter prediction features."
+    );
+  }
+
+  // ----------------------------------------------------------
+  // SEND ONLY MODEL + FEATURES
+  // ----------------------------------------------------------
+
+  const payload = {
+    model_name: cleanModelName,
+    data: predictionFeatures,
+  };
+
+  console.log(
+    "================================="
   );
+
+  console.log(
+    "ML PREDICTION REQUEST"
+  );
+
+  console.log(
+    "ENDPOINT:",
+    "/api/ml-predictions/predict"
+  );
+
+  console.log(
+    "MODEL:",
+    cleanModelName
+  );
+
+  console.log(
+    "FEATURES:",
+    predictionFeatures
+  );
+
+  console.log(
+    "PAYLOAD:",
+    payload
+  );
+
+  console.log(
+    "================================="
+  );
+
+  try {
+    const response =
+      await api.post(
+        "/api/ml-predictions/predict",
+        payload
+      );
+
+    console.log(
+      "ML PREDICTION SUCCESS:",
+      response.data
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error(
+      "ML PREDICTION FAILED:",
+      error?.response?.data ||
+        error?.message
+    );
+
+    throw new Error(
+      getApiErrorMessage(error)
+    );
+  }
 }
 
-export async function deleteEggRecord(eggId) {
-  return apiRequest(
-    `/api/egg/${eggId}`,
-    {
-      method: "DELETE",
-    }
-  );
-}
+// ============================================================
+// AI IMAGE UPLOAD
+// ============================================================
 
-/* =========================================================
-   GROWTH
-========================================================= */
-
-export async function getGrowthRecords() {
-  return apiRequest(
-    "/api/growth/"
-  );
-}
-
-export async function getGrowthRecord(growthId) {
-  return apiRequest(
-    `/api/growth/${growthId}`
-  );
-}
-
-export async function createGrowthRecord(data) {
-  return apiRequest(
-    "/api/growth/",
-    {
-      method: "POST",
-      body: JSON.stringify(data),
-    }
-  );
-}
-
-export async function updateGrowthRecord(
-  growthId,
-  data
+export async function uploadAIImage(
+  file,
+  animalId = null
 ) {
-  return apiRequest(
-    `/api/growth/${growthId}`,
-    {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    }
+  if (!file) {
+    throw new Error(
+      "Animal image is required."
+    );
+  }
+
+  const formData =
+    new FormData();
+
+  formData.append(
+    "file",
+    file
   );
+
+  if (
+    animalId !== null &&
+    animalId !== undefined &&
+    String(animalId).trim() !== ""
+  ) {
+    formData.append(
+      "animal_id",
+      String(animalId)
+    );
+  }
+
+  const response =
+    await api.post(
+      "/api/ai/upload",
+      formData,
+      {
+        headers: {
+          "Content-Type":
+            "multipart/form-data",
+        },
+      }
+    );
+
+  return response.data;
 }
 
-export async function replaceGrowthRecord(
-  growthId,
-  data
+// ============================================================
+// AI HEALTH PREDICTION
+// ============================================================
+
+export async function predictAnimalHealth(
+  file,
+  animalId = null
 ) {
-  return apiRequest(
-    `/api/growth/${growthId}`,
-    {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }
+  if (!file) {
+    throw new Error(
+      "Animal image is required."
+    );
+  }
+
+  const formData =
+    new FormData();
+
+  formData.append(
+    "file",
+    file
   );
+
+  if (
+    animalId !== null &&
+    animalId !== undefined &&
+    String(animalId).trim() !== ""
+  ) {
+    formData.append(
+      "animal_id",
+      String(animalId)
+    );
+  }
+
+  const response =
+    await api.post(
+      "/api/ai/health-predict",
+      formData,
+      {
+        headers: {
+          "Content-Type":
+            "multipart/form-data",
+        },
+      }
+    );
+
+  return response.data;
 }
 
-export async function deleteGrowthRecord(
-  growthId
+// ============================================================
+// DIGITAL TWIN
+// ============================================================
+
+export async function getDigitalTwins() {
+  const response =
+    await api.get(
+      "/api/digital-twin/"
+    );
+
+  return response.data;
+}
+
+export async function getDigitalTwinByAnimal(
+  animalId
 ) {
+  if (
+    animalId === null ||
+    animalId === undefined ||
+    String(animalId).trim() === ""
+  ) {
+    throw new Error(
+      "Animal ID is required."
+    );
+  }
+
+  const response =
+    await api.get(
+      `/api/digital-twin/animal/${encodeURIComponent(
+        animalId
+      )}`
+    );
+
+  return response.data;
+}
+
+// ============================================================
+// REPORT / DASHBOARD
+// ============================================================
+
+export async function getReportOverview() {
+  const endpoints = [
+    "/api/reports/overview",
+    "/api/reports/overview/",
+    "/api/dashboard/overview",
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      const response =
+        await api.get(endpoint);
+
+      return response.data;
+    } catch (error) {
+      if (
+        error?.response?.status === 404
+      ) {
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  return {};
+}
+
+export async function getHealthSummary() {
+  const endpoints = [
+    "/api/reports/health",
+    "/api/reports/health/",
+    "/api/dashboard/health",
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      const response =
+        await api.get(endpoint);
+
+      return response.data;
+    } catch (error) {
+      if (
+        error?.response?.status === 404
+      ) {
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  return {};
+}
+
+export async function getProductionSummary() {
+  const endpoints = [
+    "/api/reports/production",
+    "/api/reports/production/",
+    "/api/dashboard/production",
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      const response =
+        await api.get(endpoint);
+
+      return response.data;
+    } catch (error) {
+      if (
+        error?.response?.status === 404
+      ) {
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  return {};
+}
+
+// ============================================================
+// BACKEND CONNECTION TEST
+// ============================================================
+
+export async function testBackendConnection() {
   return apiRequest(
-    `/api/growth/${growthId}`,
+    "/database-test",
     {
-      method: "DELETE",
+      method: "GET",
     }
   );
 }
 
-/* =========================================================
-   DEFAULT EXPORT
-========================================================= */
+// ============================================================
+// DEFAULT EXPORT
+// ============================================================
 
-export default {
-  loginUser,
-  registerUser,
-  logoutUser,
-  testBackendConnection,
+export default api;
 
-  getFarms,
-  getFarm,
-  createFarm,
-  updateFarm,
-  deleteFarm,
-
-  getAnimals,
-  getAnimal,
-  createAnimal,
-  updateAnimal,
-  deleteAnimal,
-
-  getHealthRecords,
-  getHealthRecord,
-  createHealthRecord,
-  updateHealthRecord,
-  deleteHealthRecord,
-
-  getMilkRecords,
-  getMilkRecord,
-  createMilkRecord,
-  updateMilkRecord,
-  deleteMilkRecord,
-
-  getWoolRecords,
-  getWoolRecord,
-  createWoolRecord,
-  updateWoolRecord,
-  deleteWoolRecord,
-
-  getVaccinationRecords,
-  getVaccinationRecord,
-  createVaccinationRecord,
-  updateVaccinationRecord,
-  deleteVaccinationRecord,
-
-  getFeedRecords,
-  getFeedRecord,
-  createFeedRecord,
-  updateFeedRecord,
-  replaceFeedRecord,
-  deleteFeedRecord,
-
-  getEggRecords,
-  getEggRecord,
-  createEggRecord,
-  updateEggRecord,
-  deleteEggRecord,
-
-  getGrowthRecords,
-  getGrowthRecord,
-  createGrowthRecord,
-  updateGrowthRecord,
-  replaceGrowthRecord,
-  deleteGrowthRecord,
-};

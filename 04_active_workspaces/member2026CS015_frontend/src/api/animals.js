@@ -1,31 +1,26 @@
 import api from "./axios";
 
-// Get all animals
 export const getAnimals = async () => {
-  const response = await api.get("/animals/");
+  const response = await api.get("/api/animals/");
   return response.data;
 };
 
-// Get one animal by ID
-export const getAnimal = async (animalId) => {
-  const response = await api.get(`/animals/${animalId}`);
+export const createAnimal = async (data) => {
+  const response = await api.post("/api/animals/", data);
   return response.data;
 };
 
-// Create animal
-export const createAnimal = async (animalData) => {
-  const response = await api.post("/animals/", animalData);
+export const updateAnimal = async (animalId, data) => {
+  const response = await api.put(
+    `/api/animals/${animalId}`,
+    data
+  );
   return response.data;
 };
 
-// Update animal
-export const updateAnimal = async (animalId, animalData) => {
-  const response = await api.put(`/animals/${animalId}`, animalData);
-  return response.data;
-};
-
-// Delete animal
 export const deleteAnimal = async (animalId) => {
-  const response = await api.delete(`/animals/${animalId}`);
+  const response = await api.delete(
+    `/api/animals/${animalId}`
+  );
   return response.data;
 };
