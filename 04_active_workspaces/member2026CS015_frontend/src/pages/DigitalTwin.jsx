@@ -33,11 +33,14 @@ import {
 } from "../api/backend";
 
 // ============================================================
-// HELPERS
+// GENERAL HELPERS
 // ============================================================
 
 function formatSpecies(value) {
-  if (value === null || value === undefined) {
+  if (
+    value === null ||
+    value === undefined
+  ) {
     return "";
   }
 
@@ -45,7 +48,9 @@ function formatSpecies(value) {
     .trim()
     .replace(/[_-]+/g, " ");
 
-  if (!text) return "";
+  if (!text) {
+    return "";
+  }
 
   return text
     .split(/\s+/)
@@ -69,70 +74,215 @@ function getAnimalId(animal) {
   );
 }
 
-function getAnimalType(animal) {
-  if (!animal) return "Animal";
-
-  return formatSpecies(
-    animal?.animal_type ||
-      animal?.species ||
-      animal?.type ||
-      animal?.animal_species ||
-      "Animal"
-  );
-}
-
 function getAnimalTag(animal) {
   return (
-    animal?.tag_number ||
-    animal?.tag ||
-    animal?.animal_tag ||
-    animal?.tag_id ||
+    animal?.tag_number ??
+    animal?.tag ??
+    animal?.animal_tag ??
+    animal?.tag_id ??
     ""
   );
 }
 
-// ============================================================
-// AI RESULT HELPERS
-// ============================================================
-
-function getDetectedSpecies(result) {
-  const analysis = result?.analysis;
-
-  if (!analysis) return null;
-
-  const directSpecies =
-    analysis?.detected_species;
-
-  if (
-    directSpecies &&
-    String(directSpecies).trim()
-  ) {
-    return formatSpecies(directSpecies);
+function getAnimalType(animal) {
+  if (!animal) {
+    return "Animal";
   }
 
-  const detections =
-    analysis?.yolo?.detections;
+  return formatSpecies(
+    animal?.animal_type ||
+      animal?.species ||
+      animal?.animal_species ||
+      animal?.type ||
+      "Animal"
+  );
+}
 
-  if (
-    Array.isArray(detections) &&
-    detections.length > 0
-  ) {
-    const species = detections
-      .map(
-        (item) =>
+function getAnimalWeight(animal) {
+  return (
+    animal?.weight ??
+    animal?.body_weight ??
+    animal?.current_weight ??
+    animal?.weight_kg ??
+    null
+  );
+}
+
+// ============================================================
+// AI RESPONSE HELPERS
+// ============================================================
+
+function unwrapAIResult(result) {
+  if (!result) return {};
+  if (result?.data && typeof result.data === "object") {
+    // Axios-style response: response.data
+    if (result.data?.analysis || result.data?.result || result.data?.yolo) {
+      return result.data;
+    }
+  }
+  return result;
+}
+
+function getAnalysis(result) {
+  const root = unwrapAIResult(result);
+  return (
+    root?.analysis ||
+    root?.result?.analysis ||
+    root?.data?.analysis ||
+    (root?.yolo || root?.cnn || root?.xgboost ? root : {}) ||
+    {}
+  );
+}
+
+function getYOLO(result) {
+  const root = unwrapAIResult(result);
+  const analysis = getAnalysis(root);
+
+  return (
+    analysis?.yolo ||
+    analysis?.yolo_result ||
+    analysis?.yolo_detection ||
+    root?.yolo ||
+    root?.yolo_result ||
+    root?.yolo_detection ||
+    {}
+  );
+}
+
+function getCNN(result) {
+  const root = unwrapAIResult(result);
+  const analysis = getAnalysis(root);
+
+  return (
+    analysis?.cnn ||
+    analysis?.cnn_result ||
+    analysis?.cnn_classification ||
+    root?.cnn ||
+    root?.cnn_result ||
+    root?.cnn_classification ||
+    {}
+  );
+}
+
+// ------------------------------------------------------------
+// YOLO DETECTIONS
+// ------------------------------------------------------------
+
+function getYOLODetections(result) {
+  const root = unwrapAIResult(result);
+  const yolo = getYOLO(root);
+  const analysis = getAnalysis(root);
+
+  const possibleArrays = [
+    yolo?.detections,
+    yolo?.results,
+    yolo?.predictions,
+    yolo?.objects,
+    yolo?.animals,
+    analysis?.detections,
+    analysis?.objects,
+    root?.detections,
+    root?.objects,
+  ];
+
+  for (const value of possibleArrays) {
+    if (Array.isArray(value)) return value;
+  }
+
+  return [];
+}
+
+// ------------------------------------------------------------
+// YOLO SPECIES
+// ------------------------------------------------------------
+
+function getDetectedSpecies(result) {
+  const root = unwrapAIResult(result);
+  const analysis = getAnalysis(root);
+  const yolo = getYOLO(root);
+  const detections = getYOLODetections(root);
+
+  const directCandidates = [
+    // Actual/common backend names
+    yolo?.detected_species,
+    yolo?.detectedSpecies,
+    yolo?.species,
+    yolo?.species_name,
+    yolo?.speciesName,
+    yolo?.animal_species,
+    yolo?.animal_type,
+    yolo?.class_name,
+    yolo?.className,
+    yolo?.label,
+
+    analysis?.detected_species,
+    analysis?.detectedSpecies,
+    analysis?.species,
+    analysis?.species_name,
+    analysis?.speciesName,
+    analysis?.animal_species,
+    analysis?.animal_type,
+
+    root?.detected_species,
+    root?.detectedSpecies,
+    root?.species,
+    root?.species_name,
+    root?.speciesName,
+    root?.animal_species,
+    root?.animal_type,
+  ];
+
+  for (const candidate of directCandidates) {
+    if (
+      candidate !== null &&
+      candidate !== undefined &&
+      typeof candidate !== "object" &&
+      String(candidate).trim() !== ""
+    ) {
+      return formatSpecies(candidate);
+    }
+  }
+
+  if (detections.length > 0) {
+    const speciesList = detections
+      .map((item) => {
+        if (
+          typeof item === "string" ||
+          typeof item === "number"
+        ) {
+          return item;
+        }
+
+        if (!item || typeof item !== "object") return "";
+
+        return (
           item?.species ||
           item?.species_name ||
+          item?.speciesName ||
+          item?.animal_type ||
+          item?.animal_species ||
           item?.class_name ||
+          item?.className ||
           item?.class ||
-          item?.name ||
           item?.label ||
+          item?.name ||
+          item?.category ||
+          item?.object_name ||
+          item?.objectName ||
+          item?.detected_species ||
           ""
+        );
+      })
+      .filter(
+        (value) =>
+          value !== null &&
+          value !== undefined &&
+          String(value).trim() !== ""
       )
-      .filter(Boolean)
-      .map(formatSpecies);
+      .map(formatSpecies)
+      .filter(Boolean);
 
-    const uniqueSpecies =
-      [...new Set(species)];
+    const uniqueSpecies = [...new Set(speciesList)];
 
     if (uniqueSpecies.length > 0) {
       return uniqueSpecies.join(", ");
@@ -142,163 +292,303 @@ function getDetectedSpecies(result) {
   return null;
 }
 
+// ------------------------------------------------------------
+// YOLO COUNT
+// ------------------------------------------------------------
+
+function getDetectionCount(result) {
+  const root = unwrapAIResult(result);
+  const yolo = getYOLO(root);
+  const analysis = getAnalysis(root);
+  const detections = getYOLODetections(root);
+
+  const countCandidates = [
+    yolo?.count,
+    yolo?.animal_count,
+    yolo?.animals_detected,
+    yolo?.total_animals,
+    yolo?.totalAnimals,
+    yolo?.detection_count,
+    yolo?.detectionCount,
+
+    analysis?.animal_count,
+    analysis?.animals_detected,
+    analysis?.total_animals,
+    analysis?.totalAnimals,
+
+    root?.animal_count,
+    root?.animals_detected,
+    root?.total_animals,
+    root?.totalAnimals,
+  ];
+
+  for (const candidate of countCandidates) {
+    if (
+      candidate !== null &&
+      candidate !== undefined &&
+      candidate !== "" &&
+      Number.isFinite(Number(candidate))
+    ) {
+      return Math.max(0, Number(candidate));
+    }
+  }
+
+  return detections.length;
+}
+
+// ------------------------------------------------------------
+// YOLO CONFIDENCE
+// ------------------------------------------------------------
+
 function getDetectionConfidence(result) {
-  const yolo =
-    result?.analysis?.yolo;
+  const root = unwrapAIResult(result);
+  const yolo = getYOLO(root);
+  const analysis = getAnalysis(root);
+  const detections = getYOLODetections(root);
 
-  if (
-    typeof yolo?.confidence === "number"
-  ) {
-    return yolo.confidence;
+  const directCandidates = [
+    yolo?.confidence,
+    yolo?.best_confidence,
+    yolo?.bestConfidence,
+    yolo?.score,
+    yolo?.probability,
+    yolo?.conf,
+
+    analysis?.yolo_confidence,
+    analysis?.yoloConfidence,
+    root?.yolo_confidence,
+    root?.yoloConfidence,
+  ];
+
+  for (const candidate of directCandidates) {
+    if (
+      candidate !== null &&
+      candidate !== undefined &&
+      typeof candidate === "object"
+    ) {
+      const nested = [
+        candidate?.best,
+        candidate?.value,
+        candidate?.score,
+        candidate?.confidence,
+        candidate?.probability,
+      ];
+
+      for (const value of nested) {
+        if (Number.isFinite(Number(value))) {
+          return Number(value);
+        }
+      }
+    }
+
+    if (
+      candidate !== null &&
+      candidate !== undefined &&
+      Number.isFinite(Number(candidate))
+    ) {
+      return Number(candidate);
+    }
   }
 
-  if (
-    typeof yolo?.confidence?.best === "number"
-  ) {
-    return yolo.confidence.best;
-  }
+  if (detections.length > 0) {
+    const values = detections
+      .map((item) => {
+        if (!item || typeof item !== "object") return null;
 
-  if (
-    typeof yolo?.best_confidence === "number"
-  ) {
-    return yolo.best_confidence;
-  }
-
-  const detections =
-    yolo?.detections;
-
-  if (
-    Array.isArray(detections) &&
-    detections.length > 0
-  ) {
-    const values =
-      detections
-        .map((item) =>
-          Number(item?.confidence)
-        )
-        .filter((value) =>
-          Number.isFinite(value)
+        return (
+          item?.confidence ??
+          item?.score ??
+          item?.probability ??
+          item?.conf
         );
+      })
+      .map(Number)
+      .filter(Number.isFinite);
 
-    if (values.length > 0) {
-      return Math.max(...values);
+    if (values.length > 0) return Math.max(...values);
+  }
+
+  return null;
+}
+
+// ============================================================
+// CNN HELPERS
+// ============================================================
+
+function getCNNStatus(result) {
+  const root = unwrapAIResult(result);
+  const cnn = getCNN(root);
+
+  return (
+    cnn?.status ||
+    root?.cnn_status ||
+    root?.cnnStatus ||
+    null
+  );
+}
+
+function getCNNClassification(result) {
+  const root = unwrapAIResult(result);
+  const cnn = getCNN(root);
+
+  const candidates = [
+    cnn?.classification,
+    cnn?.prediction,
+    cnn?.predicted_class,
+    cnn?.predictedClass,
+    cnn?.result,
+    cnn?.class_name,
+    cnn?.className,
+    cnn?.class,
+    cnn?.label,
+    cnn?.disease,
+    cnn?.condition,
+  ];
+
+  for (const value of candidates) {
+    if (
+      value !== null &&
+      value !== undefined &&
+      typeof value !== "object" &&
+      String(value).trim() !== ""
+    ) {
+      return String(value);
     }
   }
 
   return null;
 }
 
-function getDetectionCount(result) {
-  const count =
-    result?.analysis?.yolo?.count;
-
-  if (typeof count === "number") {
-    return count;
-  }
-
-  const totalAnimals =
-    result?.analysis?.yolo?.total_animals;
-
-  if (typeof totalAnimals === "number") {
-    return totalAnimals;
-  }
-
-  const detections =
-    result?.analysis?.yolo?.detections;
-
-  if (Array.isArray(detections)) {
-    return detections.length;
-  }
-
-  return 0;
-}
-
-function getCNNClassification(result) {
-  const cnn =
-    result?.analysis?.cnn;
-
-  return (
-    cnn?.classification ||
-    cnn?.prediction ||
-    cnn?.result ||
-    cnn?.class_name ||
-    cnn?.class ||
-    null
-  );
-}
-
 function getCNNConfidence(result) {
-  const cnn =
-    result?.analysis?.cnn;
+  const root = unwrapAIResult(result);
+  const cnn = getCNN(root);
 
-  const value =
-    cnn?.confidence ??
-    cnn?.probability ??
-    cnn?.score;
+  const candidates = [
+    cnn?.confidence,
+    cnn?.probability,
+    cnn?.score,
+    cnn?.prediction_confidence,
+    cnn?.predictionConfidence,
+    cnn?.classification_confidence,
+    cnn?.classificationConfidence,
+  ];
 
-  if (typeof value === "number") {
-    return value;
+  for (const value of candidates) {
+    if (
+      value !== null &&
+      value !== undefined &&
+      Number.isFinite(Number(value))
+    ) {
+      return Number(value);
+    }
   }
 
   return null;
 }
 
 function getTopCNNPredictions(result) {
-  const cnn =
-    result?.analysis?.cnn;
+  const root = unwrapAIResult(result);
+  const cnn = getCNN(root);
 
   const predictions =
     cnn?.top_predictions ||
+    cnn?.topPredictions ||
     cnn?.predictions ||
-    cnn?.top_classes;
+    cnn?.top_classes ||
+    cnn?.topClasses ||
+    [];
 
-  return Array.isArray(predictions)
-    ? predictions
-    : [];
+  return Array.isArray(predictions) ? predictions : [];
 }
+
+// ------------------------------------------------------------
+// SAFE CNN CLASSIFICATION
+// A low-confidence CNN result must NOT be displayed as a
+// confirmed disease/health diagnosis.
+// ------------------------------------------------------------
+
+function getSafeCNNClassification(result) {
+  const classification = getCNNClassification(result);
+  const confidence = getCNNConfidence(result);
+  const status = String(getCNNStatus(result) || "").toLowerCase();
+
+  if (!classification) return null;
+
+  const percentage =
+    confidence === null
+      ? null
+      : Math.abs(Number(confidence)) <= 1
+        ? Number(confidence) * 100
+        : Number(confidence);
+
+  if (
+    status.includes("low") ||
+    (percentage !== null && percentage < 60)
+  ) {
+    return null;
+  }
+
+  return classification;
+}
+
+// ============================================================
+// HEALTH
+// IMPORTANT: Do not use a low-confidence CNN class as health.
+// Only explicit backend health data or a sufficiently confident
+// CNN classification is displayed.
+// ============================================================
 
 function getHealth(result) {
-  const classification =
-    getCNNClassification(result);
+  const root = unwrapAIResult(result);
+  const analysis = getAnalysis(root);
 
-  if (classification) {
-    return formatSpecies(
-      classification
-    );
-  }
+  const explicitHealth =
+    analysis?.health ||
+    root?.health;
 
-  const health =
-    result?.analysis?.health;
-
-  if (typeof health === "string") {
-    return health;
+  if (
+    typeof explicitHealth === "string" &&
+    explicitHealth.trim()
+  ) {
+    return explicitHealth;
   }
 
   if (
-    health &&
-    typeof health === "object"
+    explicitHealth &&
+    typeof explicitHealth === "object"
   ) {
     return (
-      health?.prediction ||
-      health?.classification ||
-      health?.result ||
-      health?.status ||
+      explicitHealth?.prediction ??
+      explicitHealth?.classification ??
+      explicitHealth?.result ??
+      explicitHealth?.condition ??
+      explicitHealth?.status ??
       "Not available"
     );
   }
 
-  return "Not available";
+  const safeCNNClassification =
+    getSafeCNNClassification(root);
+
+  return safeCNNClassification || "Not available";
 }
+
+// ============================================================
+// BEHAVIOUR
+// ============================================================
 
 function getBehaviour(result) {
-  const analysis =
-    result?.analysis;
+  const root = unwrapAIResult(result);
+  const analysis = getAnalysis(root);
 
   const value =
-    analysis?.behaviour ||
-    analysis?.behavior ||
-    analysis?.xgboost?.behaviour ||
-    analysis?.xgboost?.behavior;
+    analysis?.behaviour ??
+    analysis?.behavior ??
+    analysis?.behaviour_result ??
+    analysis?.behavior_result ??
+    root?.behaviour ??
+    root?.behavior ??
+    null;
 
   if (
     value === null ||
@@ -310,24 +600,34 @@ function getBehaviour(result) {
 
   if (typeof value === "object") {
     return (
-      value?.prediction ||
-      value?.result ||
-      value?.status ||
+      value?.prediction ??
+      value?.classification ??
+      value?.result ??
+      value?.behaviour ??
+      value?.behavior ??
+      value?.status ??
       "Not available"
     );
   }
 
   return String(value);
 }
+
+// ============================================================
+// ACTIVITY
+// ============================================================
 
 function getActivity(result) {
-  const analysis =
-    result?.analysis;
+  const root = unwrapAIResult(result);
+  const analysis = getAnalysis(root);
 
   const value =
-    analysis?.activity ||
-    analysis?.movement ||
-    analysis?.xgboost?.activity;
+    analysis?.activity ??
+    analysis?.movement ??
+    analysis?.activity_result ??
+    root?.activity ??
+    root?.movement ??
+    null;
 
   if (
     value === null ||
@@ -339,20 +639,139 @@ function getActivity(result) {
 
   if (typeof value === "object") {
     return (
-      value?.prediction ||
-      value?.result ||
-      value?.status ||
+      value?.prediction ??
+      value?.result ??
+      value?.activity ??
+      value?.movement ??
+      value?.status ??
       "Not available"
     );
   }
 
   return String(value);
 }
+
+// ============================================================
+// XGBOOST
+// IMPORTANT:
+// The AI image-upload response can contain:
+//   xgboost: { status: "available", models_loaded: 12 }
+// That is MODEL AVAILABILITY, not a prediction.
+//
+// Only explicit XGBoost prediction fields are accepted.
+// Generic result.prediction is deliberately ignored.
+// ============================================================
+
+function getActualXGBoostPrediction(result) {
+  const root = unwrapAIResult(result);
+  const analysis = getAnalysis(root);
+
+  const explicitCandidates = [
+    analysis?.xgboost_prediction,
+    analysis?.xgboostPrediction,
+    analysis?.xgboost_result,
+    analysis?.xgboostResult,
+
+    root?.xgboost_prediction,
+    root?.xgboostPrediction,
+    root?.xgboost_prediction_result,
+    root?.xgboostPredictionResult,
+  ];
+
+  for (const value of explicitCandidates) {
+    if (
+      value !== null &&
+      value !== undefined &&
+      value !== "" &&
+      typeof value !== "object"
+    ) {
+      return value;
+    }
+
+    if (value && typeof value === "object") {
+      const prediction =
+        value?.prediction ??
+        value?.predicted_value ??
+        value?.predictedValue ??
+        value?.prediction_value ??
+        value?.predictionValue;
+
+      if (
+        prediction !== null &&
+        prediction !== undefined &&
+        prediction !== ""
+      ) {
+        return prediction;
+      }
+    }
+  }
+
+  // Some backends may nest the actual prediction under a
+  // dedicated xgboost object. Capability-only objects are ignored.
+  const xgbObjects = [
+    analysis?.xgboost_prediction_result,
+    root?.xgboost_prediction_result,
+  ];
+
+  for (const object of xgbObjects) {
+    if (!object || typeof object !== "object") continue;
+
+    const prediction =
+      object?.prediction ??
+      object?.predicted_value ??
+      object?.predictedValue ??
+      object?.result;
+
+    if (
+      prediction !== null &&
+      prediction !== undefined &&
+      prediction !== ""
+    ) {
+      return prediction;
+    }
+  }
+
+  return null;
+}
+
+function getXGBoostModelAvailability(result) {
+  const root = unwrapAIResult(result);
+  const analysis = getAnalysis(root);
+
+  const xgboost =
+    analysis?.xgboost ||
+    root?.xgboost ||
+    null;
+
+  if (!xgboost) return null;
+
+  if (
+    typeof xgboost === "number" ||
+    typeof xgboost === "string"
+  ) {
+    return xgboost;
+  }
+
+  if (typeof xgboost !== "object") return null;
+
+  return (
+    xgboost?.models_loaded ??
+    xgboost?.modelsLoaded ??
+    xgboost?.available_models ??
+    xgboost?.availableModels ??
+    null
+  );
+}
+
+// ============================================================
+// CONFIDENCE FORMAT
+// ============================================================
 
 function formatConfidence(value) {
   if (
     value === null ||
     value === undefined ||
+    value === "" ||
     !Number.isFinite(Number(value))
   ) {
     return "—";
@@ -361,11 +780,338 @@ function formatConfidence(value) {
   const number = Number(value);
 
   const percentage =
-    number <= 1
+    Math.abs(number) <= 1
       ? number * 100
       : number;
 
   return `${percentage.toFixed(1)}%`;
+}
+
+// ============================================================
+// STATUS HELPERS
+// ============================================================
+
+function normalizeStatus(value) {
+  if (!value) return "";
+
+  return String(value)
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) =>
+      char.toUpperCase()
+    );
+}
+
+function getCNNDisplayStatus(result) {
+  const status = String(getCNNStatus(result) || "").toLowerCase();
+  const confidence = getCNNConfidence(result);
+
+  if (
+    status.includes("low") ||
+    (
+      confidence !== null &&
+      (
+        Math.abs(Number(confidence)) <= 1
+          ? Number(confidence) * 100
+          : Number(confidence)
+      ) < 60
+    )
+  ) {
+    return "Low Confidence";
+  }
+
+  if (status) return normalizeStatus(status);
+
+  return "Not available";
+}
+
+function getXGBoostDisplayStatus(result) {
+  const prediction = getActualXGBoostPrediction(result);
+  return prediction === null || prediction === undefined
+    ? "Ready / Not run"
+    : "Prediction available";
+}
+
+
+// ============================================================
+// STRUCTURED ML / XGBOOST CONNECTION
+// ============================================================
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "http://127.0.0.1:8000";
+
+const STRUCTURED_MODELS = [
+  "health",
+  "egg",
+  "feed",
+  "milk",
+  "behaviour",
+  "anomaly",
+  "milk_forecast",
+  "katanning",
+  "murdoch",
+  "muresk",
+  "muresk_dry",
+  "muresk_stubble",
+];
+
+function getAuthToken() {
+  return (
+    localStorage.getItem("access_token") ||
+    localStorage.getItem("token") ||
+    ""
+  );
+}
+
+async function mlRequest(path, options = {}) {
+  const token = getAuthToken();
+
+  const response = await fetch(
+    `${API_BASE_URL}${path}`,
+    {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token
+          ? { Authorization: `Bearer ${token}` }
+          : {}),
+        ...(options.headers || {}),
+      },
+    }
+  );
+
+  const text = await response.text();
+
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { detail: text };
+  }
+
+  if (!response.ok) {
+    const message =
+      data?.detail ||
+      data?.message ||
+      `ML request failed (${response.status})`;
+
+    const error = new Error(String(message));
+    error.status = response.status;
+    error.isUnauthorized = response.status === 401;
+    throw error;
+  }
+
+  return data;
+}
+
+function normalizeFeatureNames(response) {
+  const values =
+    response?.features ||
+    response?.feature_names ||
+    response?.featureNames ||
+    response?.data?.features ||
+    response?.data?.feature_names ||
+    response?.data ||
+    [];
+
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      values
+        .map((item) => {
+          if (typeof item === "string") return item;
+
+          if (item && typeof item === "object") {
+            return (
+              item?.name ||
+              item?.feature ||
+              item?.feature_name ||
+              item?.key ||
+              item?.column ||
+              ""
+            );
+          }
+
+          return "";
+        })
+        .map((item) => String(item).trim())
+        .filter(Boolean)
+    ),
+  ];
+}
+
+function getNumericAnimalValue(animal, keys, fallback = null) {
+  for (const key of keys) {
+    const value = animal?.[key];
+
+    if (
+      value !== null &&
+      value !== undefined &&
+      value !== "" &&
+      Number.isFinite(Number(value))
+    ) {
+      return Number(value);
+    }
+  }
+
+  return fallback;
+}
+
+function buildStructuredData(
+  animal,
+  modelName,
+  featureNames = []
+) {
+  const now = new Date();
+
+  const animalId = Number(getAnimalId(animal));
+
+  // These are real animal-record values where available.
+  // Missing model-specific sensor fields are intentionally omitted;
+  // the backend ML service handles its own documented defaults.
+  const data = {
+    animal_id: animalId,
+    id: animalId,
+    weight: getNumericAnimalValue(
+      animal,
+      ["weight", "body_weight", "current_weight", "weight_kg"],
+      0
+    ),
+  };
+
+  const species = getAnimalType(animal);
+  if (species) {
+    data.species = species;
+    data.animal_type = species;
+  }
+
+  // Behaviour model's seven known input features.
+  if (modelName === "behaviour") {
+    data.mi = getNumericAnimalValue(
+      animal,
+      ["mi", "movement_index", "movement_intensity"],
+      1
+    );
+
+    data.area = getNumericAnimalValue(
+      animal,
+      ["area", "grazing_area", "farm_area"],
+      100
+    );
+
+    data.year = now.getFullYear();
+    data.month = now.getMonth() + 1;
+    data.day = now.getDate();
+    data.hour = now.getHours();
+    data.minute = now.getMinutes();
+  }
+
+  // If the backend exposes feature names, copy only known animal values
+  // into those exact keys. This prevents [object Object] and bad payloads.
+  for (const feature of featureNames) {
+    if (
+      data[feature] !== undefined ||
+      !animal
+    ) {
+      continue;
+    }
+
+    const value =
+      animal?.[feature] ??
+      animal?.[feature.replace(/_([a-z])/g, (_, c) =>
+        c.toUpperCase()
+      )];
+
+    if (
+      value !== null &&
+      value !== undefined &&
+      value !== ""
+    ) {
+      data[feature] = value;
+    }
+  }
+
+  return data;
+}
+
+function extractMLPrediction(response) {
+  if (!response) return null;
+
+  const candidates = [
+    response?.prediction,
+    response?.predicted_value,
+    response?.predictedValue,
+    response?.result?.prediction,
+    response?.result?.predicted_value,
+    response?.data?.prediction,
+    response?.data?.predicted_value,
+  ];
+
+  for (const value of candidates) {
+    if (
+      value !== null &&
+      value !== undefined &&
+      value !== "" &&
+      typeof value !== "object"
+    ) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function getHealthModelLabel(prediction, species) {
+  if (
+    prediction === null ||
+    prediction === undefined ||
+    prediction === ""
+  ) {
+    return null;
+  }
+
+  const numeric = Number(prediction);
+
+  if (
+    Number.isFinite(numeric) &&
+    String(species).toLowerCase().includes("cow")
+  ) {
+    const cowClasses = {
+      0: "Anthrax",
+      1: "Blackleg",
+      2: "Foot and Mouth Disease",
+      3: "Lumpy Skin Disease",
+      4: "Pneumonia",
+    };
+
+    return (
+      cowClasses[Math.round(numeric)] ??
+      `Health class ${numeric}`
+    );
+  }
+
+  return String(prediction);
+}
+
+function formatMLPrediction(value) {
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return "Not returned";
+  }
+
+  if (typeof value === "number") {
+    return Number.isInteger(value)
+      ? String(value)
+      : value.toFixed(4);
+  }
+
+  return String(value);
 }
 
 // ============================================================
@@ -379,15 +1125,10 @@ function DigitalTwin3D({
 }) {
   const mountRef = useRef(null);
 
-  const sceneRef = useRef(null);
   const rendererRef = useRef(null);
   const cameraRef = useRef(null);
-  const animationRef = useRef(null);
 
-  const animalsRef = useRef([]);
-  const targetRef = useRef(
-    new THREE.Vector3(0, 0, 5)
-  );
+  const animationRef = useRef(null);
 
   const raycasterRef =
     useRef(new THREE.Raycaster());
@@ -395,105 +1136,137 @@ function DigitalTwin3D({
   const mouseRef =
     useRef(new THREE.Vector2());
 
-  const selectedRef =
-    useRef(null);
+  const targetRef = useRef(
+    new THREE.Vector3(0, 0, 5)
+  );
 
-  // ==========================================================
+  const animalsRef = useRef([]);
+
+  const [canvasReady, setCanvasReady] =
+    useState(false);
+
+  // ----------------------------------------------------------
   // MATERIALS
-  // ==========================================================
+  // ----------------------------------------------------------
 
-  const createMaterials = () => {
+  function createMaterials() {
     return {
       wool: new THREE.MeshStandardMaterial({
         color: 0xf3f3ee,
         roughness: 0.95,
       }),
 
-      woolDark: new THREE.MeshStandardMaterial({
-        color: 0xd9d9d3,
-        roughness: 1,
-      }),
+      woolDark:
+        new THREE.MeshStandardMaterial({
+          color: 0xd9d9d3,
+          roughness: 1,
+        }),
 
-      face: new THREE.MeshStandardMaterial({
-        color: 0x7b5b4a,
-        roughness: 0.8,
-      }),
+      face:
+        new THREE.MeshStandardMaterial({
+          color: 0x7b5b4a,
+          roughness: 0.8,
+        }),
 
-      faceDark: new THREE.MeshStandardMaterial({
-        color: 0x4b342a,
-        roughness: 0.85,
-      }),
+      faceDark:
+        new THREE.MeshStandardMaterial({
+          color: 0x4b342a,
+          roughness: 0.85,
+        }),
 
-      black: new THREE.MeshStandardMaterial({
-        color: 0x101010,
-        roughness: 0.5,
-      }),
+      black:
+        new THREE.MeshStandardMaterial({
+          color: 0x111111,
+          roughness: 0.5,
+        }),
 
-      brown: new THREE.MeshStandardMaterial({
-        color: 0x8a5a35,
-        roughness: 0.8,
-      }),
+      brown:
+        new THREE.MeshStandardMaterial({
+          color: 0x8a5a35,
+          roughness: 0.8,
+        }),
 
-      cowWhite: new THREE.MeshStandardMaterial({
-        color: 0xf4f4f0,
-        roughness: 0.9,
-      }),
+      cowWhite:
+        new THREE.MeshStandardMaterial({
+          color: 0xf4f4f0,
+          roughness: 0.9,
+        }),
 
-      cowBlack: new THREE.MeshStandardMaterial({
-        color: 0x222222,
-        roughness: 0.85,
-      }),
+      cowBlack:
+        new THREE.MeshStandardMaterial({
+          color: 0x222222,
+          roughness: 0.85,
+        }),
 
-      pink: new THREE.MeshStandardMaterial({
-        color: 0xd58d8d,
-        roughness: 0.8,
-      }),
+      pink:
+        new THREE.MeshStandardMaterial({
+          color: 0xd58d8d,
+          roughness: 0.8,
+        }),
 
-      chicken: new THREE.MeshStandardMaterial({
-        color: 0xe8e0c7,
-        roughness: 0.9,
-      }),
+      chicken:
+        new THREE.MeshStandardMaterial({
+          color: 0xe8e0c7,
+          roughness: 0.9,
+        }),
 
-      red: new THREE.MeshStandardMaterial({
-        color: 0xc73535,
-        roughness: 0.7,
-      }),
+      red:
+        new THREE.MeshStandardMaterial({
+          color: 0xc73535,
+          roughness: 0.7,
+        }),
 
-      orange: new THREE.MeshStandardMaterial({
-        color: 0xe39b35,
-        roughness: 0.75,
-      }),
+      orange:
+        new THREE.MeshStandardMaterial({
+          color: 0xe39b35,
+          roughness: 0.75,
+        }),
 
-      ground: new THREE.MeshStandardMaterial({
-        color: 0x31433c,
-        roughness: 1,
-      }),
+      ground:
+        new THREE.MeshStandardMaterial({
+          color: 0x31433c,
+          roughness: 1,
+        }),
 
-      fence: new THREE.MeshStandardMaterial({
-        color: 0x71806f,
-        roughness: 0.9,
-      }),
+      fence:
+        new THREE.MeshStandardMaterial({
+          color: 0x71806f,
+          roughness: 0.9,
+        }),
+
+      wood:
+        new THREE.MeshStandardMaterial({
+          color: 0x604b3b,
+          roughness: 0.9,
+        }),
+
+      metal:
+        new THREE.MeshStandardMaterial({
+          color: 0x667085,
+          metalness: 0.5,
+          roughness: 0.7,
+        }),
     };
-  };
+  }
 
-  // ==========================================================
+  // ----------------------------------------------------------
   // WOOL PUFF
-  // ==========================================================
+  // ----------------------------------------------------------
 
-  const addWoolPuff = (
+  function addWoolPuff(
     parent,
     materials,
     x,
     y,
     z,
     scale = 1
-  ) => {
+  ) {
     const puff =
       new THREE.Mesh(
         new THREE.SphereGeometry(
           0.23 * scale,
-          12,
-          10
+          10,
+          8
         ),
         materials.wool
       );
@@ -515,25 +1288,29 @@ function DigitalTwin3D({
     parent.add(puff);
 
     return puff;
-  };
+  }
 
-  // ==========================================================
+  // ----------------------------------------------------------
   // SHEEP / RUMINANT
-  // ==========================================================
+  // ----------------------------------------------------------
 
-  const createRuminant = (id, materials) => {
+  function createRuminant(
+    id,
+    materials
+  ) {
     const group =
       new THREE.Group();
 
     group.userData.id = id;
-    group.userData.type = "ruminant";
+    group.userData.type =
+      "ruminant";
+
     group.userData.phase =
       Math.random() *
       Math.PI *
       2;
 
-    // ---------------- BODY ----------------
-
+    // BODY
     const bodyGroup =
       new THREE.Group();
 
@@ -557,7 +1334,6 @@ function DigitalTwin3D({
 
     bodyGroup.add(body);
 
-    // Wool texture made from multiple rounded forms
     addWoolPuff(
       bodyGroup,
       materials,
@@ -603,12 +1379,12 @@ function DigitalTwin3D({
       1.15
     );
 
-    bodyGroup.position.y = 1.35;
+    bodyGroup.position.y =
+      1.35;
 
     group.add(bodyGroup);
 
-    // ---------------- NECK ----------------
-
+    // NECK
     const neck =
       new THREE.Mesh(
         new THREE.SphereGeometry(
@@ -635,8 +1411,7 @@ function DigitalTwin3D({
 
     group.add(neck);
 
-    // ---------------- HEAD ----------------
-
+    // HEAD
     const headGroup =
       new THREE.Group();
 
@@ -666,7 +1441,7 @@ function DigitalTwin3D({
 
     headGroup.add(head);
 
-    // Wool cap
+    // WOOL CAP
     const cap =
       new THREE.Mesh(
         new THREE.SphereGeometry(
@@ -691,8 +1466,7 @@ function DigitalTwin3D({
 
     headGroup.add(cap);
 
-    // ---------------- EARS ----------------
-
+    // EARS
     const earGeo =
       new THREE.SphereGeometry(
         0.16,
@@ -721,6 +1495,8 @@ function DigitalTwin3D({
     earL.rotation.z =
       -Math.PI / 5;
 
+    headGroup.add(earL);
+
     const earR =
       new THREE.Mesh(
         earGeo,
@@ -742,17 +1518,13 @@ function DigitalTwin3D({
     earR.rotation.z =
       Math.PI / 5;
 
-    headGroup.add(
-      earL,
-      earR
-    );
+    headGroup.add(earR);
 
-    // ---------------- EYES ----------------
-
+    // EYES
     const eyeGeo =
       new THREE.SphereGeometry(
-        0.055,
-        10,
+        0.045,
+        8,
         8
       );
 
@@ -763,10 +1535,12 @@ function DigitalTwin3D({
       );
 
     eyeL.position.set(
-      0.14,
+      0.22,
       0.08,
-      0.37
+      0.34
     );
+
+    headGroup.add(eyeL);
 
     const eyeR =
       new THREE.Mesh(
@@ -775,144 +1549,111 @@ function DigitalTwin3D({
       );
 
     eyeR.position.set(
-      -0.14,
+      -0.22,
       0.08,
-      0.37
+      0.34
     );
 
-    headGroup.add(
-      eyeL,
-      eyeR
-    );
+    headGroup.add(eyeR);
 
     group.add(headGroup);
 
-    // ---------------- LEGS ----------------
+    // LEGS
+    const legGeo =
+      new THREE.CylinderGeometry(
+        0.09,
+        0.11,
+        1.05,
+        8
+      );
 
     const legs = [];
 
     const legPositions = [
-      [0.48, 0.55],
-      [-0.48, 0.55],
-      [0.48, -0.55],
-      [-0.48, -0.55],
+      [-0.48, 0.55, 0.65],
+      [0.48, 0.55, 0.65],
+      [-0.48, 0.55, -0.65],
+      [0.48, 0.55, -0.65],
     ];
 
     legPositions.forEach(
-      ([x, z]) => {
-        const legGroup =
-          new THREE.Group();
-
-        legGroup.position.set(
-          x,
-          0.85,
-          z
-        );
-
-        const upper =
+      ([x, y, z]) => {
+        const leg =
           new THREE.Mesh(
-            new THREE.CylinderGeometry(
-              0.09,
-              0.075,
-              0.65,
-              10
-            ),
+            legGeo,
             materials.faceDark
           );
 
-        upper.position.y =
-          -0.28;
-
-        upper.castShadow = true;
-
-        legGroup.add(upper);
-
-        const hoof =
-          new THREE.Mesh(
-            new THREE.SphereGeometry(
-              0.1,
-              10,
-              8
-            ),
-            materials.black
-          );
-
-        hoof.scale.set(
-          0.9,
-          0.55,
-          1.15
+        leg.position.set(
+          x,
+          y,
+          z
         );
 
-        hoof.position.set(
-          0,
-          -0.63,
-          0.04
-        );
+        leg.castShadow = true;
 
-        hoof.castShadow = true;
+        group.add(leg);
 
-        legGroup.add(hoof);
-
-        group.add(legGroup);
-
-        legs.push(legGroup);
+        legs.push(leg);
       }
     );
 
-    // ---------------- TAIL ----------------
-
+    // TAIL
     const tail =
       new THREE.Mesh(
-        new THREE.ConeGeometry(
-          0.1,
-          0.4,
-          10
+        new THREE.CylinderGeometry(
+          0.045,
+          0.07,
+          0.55,
+          8
         ),
-        materials.wool
+        materials.woolDark
       );
+
+    tail.position.set(
+      0,
+      1.45,
+      -1.35
+    );
 
     tail.rotation.x =
       Math.PI / 2;
 
-    tail.position.set(
-      0,
-      1.55,
-      -1.35
-    );
-
     group.add(tail);
 
-    group.userData = {
-      ...group.userData,
-      head: headGroup,
-      body: bodyGroup,
-      legs,
-      tail,
-    };
+    group.userData.legs =
+      legs;
+
+    group.userData.head =
+      headGroup;
+
+    group.userData.tail =
+      tail;
 
     return group;
-  };
+  }
 
-  // ============================================================
-  // COW
-  // ============================================================
+  // ----------------------------------------------------------
+  // DAIRY COW
+  // ----------------------------------------------------------
 
-  const createDairy = (id, materials) => {
+  function createCow(
+    id,
+    materials
+  ) {
     const group =
       new THREE.Group();
 
     group.userData.id = id;
-    group.userData.type = "dairy";
+    group.userData.type =
+      "cow";
+
     group.userData.phase =
       Math.random() *
       Math.PI *
       2;
 
-    // ---------------- BODY ----------------
-
-    const bodyGroup =
-      new THREE.Group();
-
+    // BODY
     const body =
       new THREE.Mesh(
         new THREE.SphereGeometry(
@@ -924,17 +1665,44 @@ function DigitalTwin3D({
       );
 
     body.scale.set(
-      1.05,
-      0.82,
-      1.55
+      1.35,
+      0.85,
+      1.8
     );
+
+    body.position.y =
+      1.25;
 
     body.castShadow = true;
 
-    bodyGroup.add(body);
+    group.add(body);
 
-    // Black patches
+    // BLACK PATCHES
     const patch1 =
+      new THREE.Mesh(
+        new THREE.SphereGeometry(
+          0.35,
+          12,
+          10
+        ),
+        materials.cowBlack
+      );
+
+    patch1.scale.set(
+      1.2,
+      0.5,
+      0.8
+    );
+
+    patch1.position.set(
+      0.65,
+      1.55,
+      0.4
+    );
+
+    group.add(patch1);
+
+    const patch2 =
       new THREE.Mesh(
         new THREE.SphereGeometry(
           0.3,
@@ -944,131 +1712,140 @@ function DigitalTwin3D({
         materials.cowBlack
       );
 
-    patch1.scale.set(
-      1,
-      0.55,
-      0.35
-    );
-
-    patch1.position.set(
-      0.65,
-      0.25,
-      0.35
-    );
-
-    bodyGroup.add(patch1);
-
-    const patch2 =
-      new THREE.Mesh(
-        new THREE.SphereGeometry(
-          0.28,
-          12,
-          10
-        ),
-        materials.cowBlack
-      );
-
     patch2.scale.set(
       1,
-      0.55,
-      0.4
+      0.5,
+      0.8
     );
 
     patch2.position.set(
-      -0.65,
-      0.15,
-      -0.4
+      -0.75,
+      1.3,
+      -0.35
     );
 
-    bodyGroup.add(patch2);
+    group.add(patch2);
 
-    bodyGroup.position.y =
-      1.45;
-
-    group.add(bodyGroup);
-
-    // ---------------- NECK ----------------
-
+    // NECK
     const neck =
       new THREE.Mesh(
+        new THREE.CylinderGeometry(
+          0.38,
+          0.5,
+          1.15,
+          12
+        ),
+        materials.cowWhite
+      );
+
+    neck.position.set(
+      0,
+      1.65,
+      1.3
+    );
+
+    group.add(neck);
+
+    // HEAD
+    const head =
+      new THREE.Group();
+
+    head.position.set(
+      0,
+      1.95,
+      1.65
+    );
+
+    const headMesh =
+      new THREE.Mesh(
         new THREE.SphereGeometry(
-          0.45,
+          0.48,
           16,
           12
         ),
         materials.cowWhite
       );
 
-    neck.scale.set(
-      0.95,
-      1.25,
-      0.9
-    );
-
-    neck.position.set(
-      0,
-      1.5,
-      1.15
-    );
-
-    group.add(neck);
-
-    // ---------------- HEAD ----------------
-
-    const headGroup =
-      new THREE.Group();
-
-    headGroup.position.set(
-      0,
-      1.9,
-      1.5
-    );
-
-    const head =
-      new THREE.Mesh(
-        new THREE.SphereGeometry(
-          0.42,
-          18,
-          14
-        ),
-        materials.cowWhite
-      );
-
-    head.scale.set(
+    headMesh.scale.set(
       0.9,
-      0.9,
-      1.15
+      1,
+      1.2
     );
 
-    headGroup.add(head);
+    head.add(headMesh);
 
-    // muzzle
+    // MUZZLE
     const muzzle =
       new THREE.Mesh(
         new THREE.SphereGeometry(
-          0.25,
-          14,
-          10
+          0.27,
+          12,
+          8
         ),
         materials.pink
       );
 
     muzzle.scale.set(
-      1.15,
-      0.7,
-      0.75
+      1,
+      0.65,
+      0.85
     );
 
-    muzzle.position.z =
-      0.35;
+    muzzle.position.set(
+      0,
+      -0.05,
+      0.45
+    );
 
-    headGroup.add(muzzle);
+    head.add(muzzle);
 
-    // ears
+    // HORNS
+    const hornGeo =
+      new THREE.ConeGeometry(
+        0.07,
+        0.42,
+        8
+      );
+
+    const hornL =
+      new THREE.Mesh(
+        hornGeo,
+        materials.brown
+      );
+
+    hornL.position.set(
+      0.28,
+      0.38,
+      0
+    );
+
+    hornL.rotation.z =
+      -0.45;
+
+    head.add(hornL);
+
+    const hornR =
+      new THREE.Mesh(
+        hornGeo,
+        materials.brown
+      );
+
+    hornR.position.set(
+      -0.28,
+      0.38,
+      0
+    );
+
+    hornR.rotation.z =
+      0.45;
+
+    head.add(hornR);
+
+    // EARS
     const earGeo =
       new THREE.SphereGeometry(
-        0.18,
-        12,
+        0.15,
+        10,
         8
       );
 
@@ -1079,16 +1856,18 @@ function DigitalTwin3D({
       );
 
     earL.scale.set(
-      1.3,
-      0.4,
-      0.75
+      1.5,
+      0.5,
+      0.8
     );
 
     earL.position.set(
-      0.35,
-      0.12,
+      0.48,
+      0.2,
       0
     );
+
+    head.add(earL);
 
     const earR =
       new THREE.Mesh(
@@ -1097,70 +1876,24 @@ function DigitalTwin3D({
       );
 
     earR.scale.set(
-      1.3,
-      0.4,
-      0.75
+      1.5,
+      0.5,
+      0.8
     );
 
     earR.position.set(
-      -0.35,
-      0.12,
+      -0.48,
+      0.2,
       0
     );
 
-    headGroup.add(
-      earL,
-      earR
-    );
+    head.add(earR);
 
-    // horns
-    const hornGeo =
-      new THREE.ConeGeometry(
-        0.06,
-        0.3,
-        10
-      );
-
-    const hornL =
-      new THREE.Mesh(
-        hornGeo,
-        materials.face
-      );
-
-    hornL.position.set(
-      0.22,
-      0.35,
-      -0.05
-    );
-
-    hornL.rotation.z =
-      -Math.PI / 5;
-
-    const hornR =
-      new THREE.Mesh(
-        hornGeo,
-        materials.face
-      );
-
-    hornR.position.set(
-      -0.22,
-      0.35,
-      -0.05
-    );
-
-    hornR.rotation.z =
-      Math.PI / 5;
-
-    headGroup.add(
-      hornL,
-      hornR
-    );
-
-    // eyes
+    // EYES
     const eyeGeo =
       new THREE.SphereGeometry(
-        0.055,
-        10,
+        0.045,
+        8,
         8
       );
 
@@ -1171,10 +1904,12 @@ function DigitalTwin3D({
       );
 
     eyeL.position.set(
-      0.16,
-      0.08,
-      0.36
+      0.24,
+      0.12,
+      0.38
     );
+
+    head.add(eyeL);
 
     const eyeR =
       new THREE.Mesh(
@@ -1183,139 +1918,115 @@ function DigitalTwin3D({
       );
 
     eyeR.position.set(
-      -0.16,
-      0.08,
-      0.36
+      -0.24,
+      0.12,
+      0.38
     );
 
-    headGroup.add(
-      eyeL,
-      eyeR
-    );
+    head.add(eyeR);
 
-    group.add(headGroup);
+    group.add(head);
 
-    // ---------------- LEGS ----------------
+    // LEGS
+    const legGeo =
+      new THREE.CylinderGeometry(
+        0.11,
+        0.14,
+        1.1,
+        8
+      );
 
     const legs = [];
 
     [
-      [0.5, 0.65],
-      [-0.5, 0.65],
-      [0.5, -0.65],
-      [-0.5, -0.65],
-    ].forEach(([x, z]) => {
-      const legGroup =
-        new THREE.Group();
+      [-0.72, 0.55, 0.85],
+      [0.72, 0.55, 0.85],
+      [-0.72, 0.55, -0.85],
+      [0.72, 0.55, -0.85],
+    ].forEach(
+      ([x, y, z]) => {
+        const leg =
+          new THREE.Mesh(
+            legGeo,
+            materials.cowWhite
+          );
 
-      legGroup.position.set(
-        x,
-        0.9,
-        z
-      );
-
-      const leg =
-        new THREE.Mesh(
-          new THREE.CylinderGeometry(
-            0.085,
-            0.065,
-            0.95,
-            10
-          ),
-          materials.face
+        leg.position.set(
+          x,
+          y,
+          z
         );
 
-      leg.position.y =
-        -0.45;
+        leg.castShadow = true;
 
-      leg.castShadow = true;
+        group.add(leg);
 
-      legGroup.add(leg);
+        legs.push(leg);
+      }
+    );
 
-      const hoof =
-        new THREE.Mesh(
-          new THREE.SphereGeometry(
-            0.1,
-            10,
-            8
-          ),
-          materials.black
-        );
-
-      hoof.scale.set(
-        0.9,
-        0.5,
-        1.1
-      );
-
-      hoof.position.y =
-        -0.92;
-
-      legGroup.add(hoof);
-
-      group.add(legGroup);
-
-      legs.push(legGroup);
-    });
-
-    // ---------------- TAIL ----------------
-
+    // TAIL
     const tail =
       new THREE.Mesh(
         new THREE.CylinderGeometry(
-          0.035,
-          0.025,
-          0.75,
+          0.045,
+          0.07,
+          0.8,
           8
         ),
-        materials.face
+        materials.cowBlack
       );
 
     tail.position.set(
       0,
-      1.55,
-      -1.65
+      1.35,
+      -1.8
     );
 
     tail.rotation.x =
-      Math.PI / 3;
+      Math.PI / 2;
 
     group.add(tail);
 
-    group.userData = {
-      ...group.userData,
-      head: headGroup,
-      body: bodyGroup,
-      legs,
-      tail,
-    };
+    group.userData.legs =
+      legs;
+
+    group.userData.head =
+      head;
+
+    group.userData.tail =
+      tail;
 
     return group;
-  };
+  }
 
-  // ============================================================
+  // ----------------------------------------------------------
   // CHICKEN
-  // ============================================================
+  // ----------------------------------------------------------
 
-  const createPoultry = (id, materials) => {
+  function createChicken(
+    id,
+    materials
+  ) {
     const group =
       new THREE.Group();
 
     group.userData.id = id;
-    group.userData.type = "poultry";
+    group.userData.type =
+      "poultry";
+
     group.userData.phase =
       Math.random() *
       Math.PI *
       2;
 
-    // ---------------- BODY ----------------
-
+    // BODY
     const body =
       new THREE.Mesh(
         new THREE.SphereGeometry(
-          0.55,
+          0.5,
           16,
-          14
+          12
         ),
         materials.chicken
       );
@@ -1323,46 +2034,43 @@ function DigitalTwin3D({
     body.scale.set(
       0.9,
       1,
-      1.2
+      1.25
     );
 
     body.position.y =
-      0.8;
+      0.72;
 
     body.castShadow = true;
 
     group.add(body);
 
-    // ---------------- HEAD ----------------
-
-    const headGroup =
+    // HEAD
+    const head =
       new THREE.Group();
 
-    headGroup.position.set(
+    head.position.set(
       0,
-      1.35,
-      0.45
+      1.25,
+      0.35
     );
 
-    const head =
+    const headMesh =
       new THREE.Mesh(
         new THREE.SphereGeometry(
           0.3,
-          16,
-          12
+          14,
+          10
         ),
         materials.chicken
       );
 
-    head.castShadow = true;
+    head.add(headMesh);
 
-    headGroup.add(head);
-
-    // beak
+    // BEAK
     const beak =
       new THREE.Mesh(
         new THREE.ConeGeometry(
-          0.09,
+          0.1,
           0.3,
           8
         ),
@@ -1372,16 +2080,19 @@ function DigitalTwin3D({
     beak.rotation.x =
       Math.PI / 2;
 
-    beak.position.z =
-      0.32;
+    beak.position.set(
+      0,
+      -0.03,
+      0.28
+    );
 
-    headGroup.add(beak);
+    head.add(beak);
 
-    // comb
+    // COMB
     const comb =
       new THREE.Mesh(
         new THREE.SphereGeometry(
-          0.12,
+          0.11,
           10,
           8
         ),
@@ -1389,104 +2100,128 @@ function DigitalTwin3D({
       );
 
     comb.scale.set(
-      0.65,
-      1.2,
-      0.7
+      0.7,
+      1.5,
+      0.5
     );
 
     comb.position.y =
-      0.28;
+      0.27;
 
-    headGroup.add(comb);
+    head.add(comb);
 
-    // eyes
-    const eye =
+    // EYES
+    const eyeGeo =
+      new THREE.SphereGeometry(
+        0.035,
+        8,
+        8
+      );
+
+    const eyeL =
       new THREE.Mesh(
-        new THREE.SphereGeometry(
-          0.04,
-          8,
-          8
-        ),
+        eyeGeo,
         materials.black
       );
 
-    eye.position.set(
-      0.12,
-      0.04,
-      0.27
+    eyeL.position.set(
+      0.17,
+      0.06,
+      0.22
     );
 
-    const eye2 =
-      eye.clone();
+    head.add(eyeL);
 
-    eye2.position.x =
-      -0.12;
+    const eyeR =
+      new THREE.Mesh(
+        eyeGeo,
+        materials.black
+      );
 
-    headGroup.add(
-      eye,
-      eye2
+    eyeR.position.set(
+      -0.17,
+      0.06,
+      0.22
     );
 
-    group.add(headGroup);
+    head.add(eyeR);
 
-    // ---------------- WINGS ----------------
+    group.add(head);
 
-    const wings = [];
-
-    [-1, 1].forEach((side) => {
-      const wing =
-        new THREE.Mesh(
-          new THREE.SphereGeometry(
-            0.3,
-            14,
-            10
-          ),
-          materials.chicken
-        );
-
-      wing.scale.set(
-        0.25,
-        0.8,
-        1.1
+    // WINGS
+    const wingGeo =
+      new THREE.SphereGeometry(
+        0.28,
+        12,
+        10
       );
 
-      wing.position.set(
-        side * 0.42,
-        0.85,
-        0
+    const wingL =
+      new THREE.Mesh(
+        wingGeo,
+        materials.woolDark
       );
 
-      wing.rotation.z =
-        side * 0.25;
+    wingL.scale.set(
+      0.35,
+      1,
+      1.1
+    );
 
-      wing.castShadow = true;
+    wingL.position.set(
+      0.45,
+      0.85,
+      0
+    );
 
-      group.add(wing);
+    group.add(wingL);
 
-      wings.push(wing);
-    });
+    const wingR =
+      new THREE.Mesh(
+        wingGeo,
+        materials.woolDark
+      );
 
-    // ---------------- LEGS ----------------
+    wingR.scale.set(
+      0.35,
+      1,
+      1.1
+    );
 
+    wingR.position.set(
+      -0.45,
+      0.85,
+      0
+    );
+
+    group.add(wingR);
+
+    // LEGS
     const legs = [];
 
-    [-0.16, 0.16].forEach(
-      (x) => {
+    const legGeo =
+      new THREE.CylinderGeometry(
+        0.035,
+        0.045,
+        0.55,
+        8
+      );
+
+    [
+      [-0.16, 0.35, 0.15],
+      [0.16, 0.35, 0.15],
+    ].forEach(
+      ([x, y, z]) => {
         const leg =
           new THREE.Mesh(
-            new THREE.CylinderGeometry(
-              0.035,
-              0.025,
-              0.45,
-              8
-            ),
+            legGeo,
             materials.orange
           );
 
         leg.position.set(
           x,
-          0.3,
-          0.05
+          y,
+          z
         );
 
         group.add(leg);
@@ -1495,57 +2230,190 @@ function DigitalTwin3D({
       }
     );
 
-    // ---------------- TAIL FEATHERS ----------------
+    group.userData.legs =
+      legs;
 
-    for (let i = -1; i <= 1; i++) {
-      const feather =
-        new THREE.Mesh(
-          new THREE.SphereGeometry(
-            0.16,
-            10,
-            8
-          ),
-          materials.chicken
-        );
+    group.userData.head =
+      head;
 
-      feather.scale.set(
-        0.45,
-        0.75,
-        1
-      );
-
-      feather.position.set(
-        i * 0.12,
-        0.95,
-        -0.55
-      );
-
-      feather.rotation.x =
-        -0.5;
-
-      group.add(feather);
-    }
-
-    group.userData = {
-      ...group.userData,
-      head: headGroup,
-      body,
-      legs,
-      wings,
-    };
+    group.userData.wings = [
+      wingL,
+      wingR,
+    ];
 
     return group;
-  };
+  }
 
-  // ============================================================
-  // SCENE SETUP
-  // ============================================================
+  // ----------------------------------------------------------
+  // FARM ENVIRONMENT
+  // ----------------------------------------------------------
+
+  function createBarn(
+    scene,
+    materials
+  ) {
+    const barn =
+      new THREE.Group();
+
+    const body =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          8,
+          4.2,
+          5
+        ),
+        materials.wood
+      );
+
+    body.position.set(
+      0,
+      2.1,
+      -9
+    );
+
+    body.castShadow = true;
+    body.receiveShadow = true;
+
+    barn.add(body);
+
+    // ROOF
+    const roof =
+      new THREE.Mesh(
+        new THREE.ConeGeometry(
+          5.8,
+          2.2,
+          4
+        ),
+        materials.red
+      );
+
+    roof.rotation.y =
+      Math.PI / 4;
+
+    roof.position.set(
+      0,
+      5.1,
+      -9
+    );
+
+    roof.castShadow = true;
+
+    barn.add(roof);
+
+    // DOOR
+    const door =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          2.2,
+          2.8,
+          0.15
+        ),
+        materials.black
+      );
+
+    door.position.set(
+      0,
+      1.4,
+      -6.45
+    );
+
+    barn.add(door);
+
+    scene.add(barn);
+  }
+
+  function createFence(
+    scene,
+    materials
+  ) {
+    const fence =
+      new THREE.Group();
+
+    for (
+      let x = -18;
+      x <= 18;
+      x += 3
+    ) {
+      const post =
+        new THREE.Mesh(
+          new THREE.BoxGeometry(
+            0.18,
+            1.6,
+            0.18
+          ),
+          materials.fence
+        );
+
+      post.position.set(
+        x,
+        0.8,
+        -17
+      );
+
+      post.castShadow = true;
+
+      fence.add(post);
+    }
+
+    const rail1 =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          36,
+          0.15,
+          0.15
+        ),
+        materials.fence
+      );
+
+    rail1.position.set(
+      0,
+      1.2,
+      -17
+    );
+
+    fence.add(rail1);
+
+    const rail2 =
+      new THREE.Mesh(
+        new THREE.BoxGeometry(
+          36,
+          0.15,
+          0.15
+        ),
+        materials.fence
+      );
+
+    rail2.position.set(
+      0,
+      0.65,
+      -17
+    );
+
+    fence.add(rail2);
+
+    scene.add(fence);
+  }
+
+  // ----------------------------------------------------------
+  // INITIALISE THREE
+  // ----------------------------------------------------------
 
   useEffect(() => {
     const mount =
       mountRef.current;
 
-    if (!mount) return;
+    if (!mount) {
+      return;
+    }
+
+    // Clear previous canvas
+    while (
+      mount.firstChild
+    ) {
+      mount.removeChild(
+        mount.firstChild
+      );
+    }
 
     const scene =
       new THREE.Scene();
@@ -1555,15 +2423,25 @@ function DigitalTwin3D({
         0x0b1220
       );
 
-    sceneRef.current = scene;
+    scene.fog =
+      new THREE.Fog(
+        0x0b1220,
+        28,
+        70
+      );
+
+    const width =
+      mount.clientWidth || 800;
+
+    const height =
+      mount.clientHeight || 520;
 
     const camera =
       new THREE.PerspectiveCamera(
-        45,
-        mount.clientWidth /
-          mount.clientHeight,
+        42,
+        width / height,
         0.1,
-        200
+        100
       );
 
     camera.position.set(
@@ -1589,88 +2467,115 @@ function DigitalTwin3D({
 
     renderer.setPixelRatio(
       Math.min(
-        window.devicePixelRatio,
+        window.devicePixelRatio || 1,
         2
       )
     );
 
     renderer.setSize(
-      mount.clientWidth,
-      mount.clientHeight
+      width,
+      height
     );
 
     renderer.shadowMap.enabled =
       true;
 
-    renderer.shadowMap.type =
-      THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace =
+      THREE.SRGBColorSpace;
+
+    renderer.toneMapping =
+      THREE.ACESFilmicToneMapping;
+
+    renderer.toneMappingExposure =
+      1.1;
+
+    rendererRef.current =
+      renderer;
 
     mount.appendChild(
       renderer.domElement
     );
 
-    rendererRef.current =
-      renderer;
-
-    // ========================================================
-    // LIGHTS
-    // ========================================================
+    // --------------------------------------------------------
+    // LIGHTING
+    // --------------------------------------------------------
 
     const ambient =
       new THREE.HemisphereLight(
-        0xbfd4e8,
-        0x26352d,
-        2.1
+        0xb8d8d0,
+        0x17241f,
+        1.7
       );
 
     scene.add(ambient);
 
-    const sun =
+    const directional =
       new THREE.DirectionalLight(
         0xffffff,
-        3
+        2.5
       );
 
-    sun.position.set(
-      8,
-      14,
-      8
+    directional.position.set(
+      12,
+      20,
+      10
     );
 
-    sun.castShadow = true;
+    directional.castShadow =
+      true;
 
-    sun.shadow.mapSize.width =
+    directional.shadow.mapSize.width =
       2048;
 
-    sun.shadow.mapSize.height =
+    directional.shadow.mapSize.height =
       2048;
 
-    sun.shadow.camera.left =
-      -30;
+    directional.shadow.camera.left =
+      -25;
 
-    sun.shadow.camera.right =
-      30;
+    directional.shadow.camera.right =
+      25;
 
-    sun.shadow.camera.top =
-      30;
+    directional.shadow.camera.top =
+      25;
 
-    sun.shadow.camera.bottom =
-      -30;
+    directional.shadow.camera.bottom =
+      -25;
 
-    scene.add(sun);
+    scene.add(
+      directional
+    );
 
-    // ========================================================
-    // GROUND
-    // ========================================================
+    const fill =
+      new THREE.DirectionalLight(
+        0x88a99e,
+        0.8
+      );
+
+    fill.position.set(
+      -15,
+      8,
+      -5
+    );
+
+    scene.add(fill);
+
+    // --------------------------------------------------------
+    // MATERIALS
+    // --------------------------------------------------------
 
     const materials =
       createMaterials();
 
+    // --------------------------------------------------------
+    // GROUND
+    // --------------------------------------------------------
+
     const ground =
       new THREE.Mesh(
         new THREE.PlaneGeometry(
-          90,
-          90
+          60,
+          60
         ),
         materials.ground
       );
@@ -1678,21 +2583,16 @@ function DigitalTwin3D({
     ground.rotation.x =
       -Math.PI / 2;
 
-    ground.position.y =
-      -0.01;
-
-    ground.receiveShadow = true;
+    ground.receiveShadow =
+      true;
 
     scene.add(ground);
 
-    // ========================================================
     // GRID
-    // ========================================================
-
     const grid =
       new THREE.GridHelper(
-        70,
-        35,
+        50,
+        50,
         0x52685f,
         0x263d35
       );
@@ -1700,239 +2600,33 @@ function DigitalTwin3D({
     grid.position.y =
       0.01;
 
-    grid.material.opacity =
-      0.38;
-
-    grid.material.transparent =
-      true;
-
     scene.add(grid);
 
-    // ========================================================
-    // FARM STRUCTURE
-    // ========================================================
-
-    const barn =
-      new THREE.Group();
-
-    const barnBody =
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          5,
-          2.7,
-          5
-        ),
-        new THREE.MeshStandardMaterial({
-          color: 0x354154,
-          roughness: 0.9,
-        })
-      );
-
-    barnBody.position.set(
-      0,
-      1.35,
-      -7
+    createBarn(
+      scene,
+      materials
     );
 
-    barnBody.castShadow = true;
-
-    barn.add(barnBody);
-
-    const roof =
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          5.5,
-          0.25,
-          5.5
-        ),
-        new THREE.MeshStandardMaterial({
-          color: 0x4c5b6f,
-          roughness: 0.8,
-        })
-      );
-
-    roof.position.set(
-      0,
-      2.78,
-      -7
+    createFence(
+      scene,
+      materials
     );
 
-    roof.castShadow = true;
-
-    barn.add(roof);
-
-    scene.add(barn);
-
-    // ========================================================
-    // FENCE
-    // ========================================================
-
-    const fenceGroup =
-      new THREE.Group();
-
-    const fenceMat =
-      materials.fence;
-
-    for (
-      let x = -18;
-      x <= 18;
-      x += 3
-    ) {
-      const post =
-        new THREE.Mesh(
-          new THREE.CylinderGeometry(
-            0.06,
-            0.06,
-            1.3,
-            8
-          ),
-          fenceMat
-        );
-
-      post.position.set(
-        x,
-        0.65,
-        -16
-      );
-
-      fenceGroup.add(post);
-    }
-
-    const fenceRail =
-      new THREE.Mesh(
-        new THREE.BoxGeometry(
-          36,
-          0.08,
-          0.08
-        ),
-        fenceMat
-      );
-
-    fenceRail.position.set(
-      0,
-      0.9,
-      -16
-    );
-
-    fenceGroup.add(fenceRail);
-
-    scene.add(fenceGroup);
-
-    // ========================================================
-    // ANIMALS
-    // ========================================================
-
-    const animalMeshes = [];
-
-    const count =
-      mode === "individual"
-        ? 1
-        : species === "poultry"
-        ? 18
-        : 10;
-
-    for (
-      let i = 0;
-      i < count;
-      i++
-    ) {
-      let animal;
-
-      if (species === "dairy") {
-        animal =
-          createDairy(
-            i + 1,
-            materials
-          );
-      } else if (
-        species === "poultry"
-      ) {
-        animal =
-          createPoultry(
-            i + 1,
-            materials
-          );
-      } else {
-        animal =
-          createRuminant(
-            i + 1,
-            materials
-          );
-      }
-
-      if (mode === "individual") {
-        animal.position.set(
-          0,
-          0,
-          4.5
-        );
-      } else {
-        const angle =
-          Math.random() *
-          Math.PI *
-          2;
-
-        const radius =
-          species === "poultry"
-            ? 7 +
-              Math.random() * 8
-            : 5 +
-              Math.random() * 9;
-
-        animal.position.set(
-          Math.cos(angle) *
-            radius,
-          0,
-          Math.sin(angle) *
-            radius +
-            4
-        );
-      }
-
-      animal.scale.setScalar(
-        species === "poultry"
-          ? 1.05
-          : 1
-      );
-
-      animal.castShadow =
-        true;
-
-      animalMeshes.push({
-        mesh: animal,
-        velocity:
-          new THREE.Vector3(
-            (Math.random() -
-              0.5) *
-              1.5,
-            0,
-            (Math.random() -
-              0.5) *
-              1.5
-          ),
-      });
-
-      scene.add(animal);
-    }
-
-    animalsRef.current =
-      animalMeshes;
-
-    // ========================================================
+    // --------------------------------------------------------
     // TARGET INDICATOR
-    // ========================================================
+    // --------------------------------------------------------
 
     const indicator =
       new THREE.Mesh(
         new THREE.RingGeometry(
-          0.45,
-          0.62,
+          0.35,
+          0.48,
           32
         ),
         new THREE.MeshBasicMaterial({
-          color: 0x22c55e,
+          color: 0x6ee7b7,
           transparent: true,
-          opacity: 0.85,
+          opacity: 0.8,
           side: THREE.DoubleSide,
         })
       );
@@ -1942,23 +2636,145 @@ function DigitalTwin3D({
 
     indicator.position.set(
       0,
-      0.04,
+      0.03,
       5
     );
 
-    indicator.visible =
-      mode === "individual";
-
     scene.add(indicator);
 
-    // ========================================================
+    // --------------------------------------------------------
+    // ANIMALS
+    // --------------------------------------------------------
+
+    const animalMeshes =
+      [];
+
+    const isPoultry =
+      species === "poultry";
+
+    const isDairy =
+      species === "dairy";
+
+    const count =
+      mode === "individual"
+        ? 1
+        : isPoultry
+        ? 18
+        : 10;
+
+    for (
+      let index = 0;
+      index < count;
+      index++
+    ) {
+      const animalIdValue =
+        mode === "individual"
+          ? animalId || "1"
+          : `${index + 1}`;
+
+      let animal;
+
+      if (isPoultry) {
+        animal =
+          createChicken(
+            animalIdValue,
+            materials
+          );
+      } else if (isDairy) {
+        animal =
+          createCow(
+            animalIdValue,
+            materials
+          );
+      } else {
+        animal =
+          createRuminant(
+            animalIdValue,
+            materials
+          );
+      }
+
+      if (
+        mode === "individual"
+      ) {
+        animal.position.set(
+          0,
+          0,
+          4
+        );
+
+        animal.scale.setScalar(
+          isPoultry
+            ? 1.25
+            : 1
+        );
+      } else {
+        const angle =
+          Math.random() *
+          Math.PI *
+          2;
+
+        const radius =
+          3 +
+          Math.random() *
+            11;
+
+        animal.position.set(
+          Math.cos(angle) *
+            radius,
+          0,
+          Math.sin(angle) *
+            radius +
+            3
+        );
+
+        const scale =
+          isPoultry
+            ? 0.65 +
+              Math.random() *
+                0.25
+            : 0.8 +
+              Math.random() *
+                0.25;
+
+        animal.scale.setScalar(
+          scale
+        );
+      }
+
+      animal.userData.velocity =
+        new THREE.Vector3(
+          (Math.random() -
+            0.5) *
+            0.6,
+          0,
+          (Math.random() -
+            0.5) *
+            0.6
+        );
+
+      scene.add(animal);
+
+      animalMeshes.push({
+        mesh: animal,
+        velocity:
+          animal.userData.velocity,
+      });
+    }
+
+    animalsRef.current =
+      animalMeshes;
+
+    // --------------------------------------------------------
     // ANIMATION
-    // ========================================================
+    // --------------------------------------------------------
 
-    const clock =
-      new THREE.Clock();
+    let previousTime =
+      performance.now();
 
-    const animate = () => {
+    const animate = (
+      currentTime
+    ) => {
       animationRef.current =
         requestAnimationFrame(
           animate
@@ -1966,23 +2782,28 @@ function DigitalTwin3D({
 
       const delta =
         Math.min(
-          clock.getDelta(),
+          (currentTime -
+            previousTime) /
+            1000,
           0.05
         );
 
+      previousTime =
+        currentTime;
+
       const time =
-        clock.elapsedTime;
+        currentTime / 1000;
 
-      // -------------------------
-      // Individual
-      // -------------------------
-
+      // INDIVIDUAL
       if (
         mode === "individual" &&
-        animalMeshes.length
+        animalMeshes.length > 0
       ) {
+        const item =
+          animalMeshes[0];
+
         const animal =
-          animalMeshes[0].mesh;
+          item.mesh;
 
         const rig =
           animal.userData;
@@ -1994,19 +2815,20 @@ function DigitalTwin3D({
               animal.position
             );
 
+        direction.y = 0;
+
         const distance =
           direction.length();
 
-        let speed = 0;
-
-        if (distance > 0.12) {
+        if (
+          distance > 0.15
+        ) {
           direction.normalize();
 
-          speed =
-            Math.min(
-              distance * 1.8,
-              1.6
-            );
+          const speed =
+            isPoultry
+              ? 2.2
+              : 1.3;
 
           animal.position.addScaledVector(
             direction,
@@ -2018,23 +2840,29 @@ function DigitalTwin3D({
               direction.x,
               direction.z
             );
-        }
 
-        if (rig.phase !== undefined) {
-          rig.phase +=
-            delta *
-            speed *
-            5;
+          if (
+            rig.phase !==
+            undefined
+          ) {
+            rig.phase +=
+              delta *
+              speed *
+              5;
+          }
         }
 
         if (
-          speed > 0.08 &&
           rig.legs
         ) {
           rig.legs.forEach(
-            (leg, index) => {
+            (
+              leg,
+              index
+            ) => {
               const offset =
-                index % 2 === 0
+                index % 2 ===
+                0
                   ? 0
                   : Math.PI;
 
@@ -2042,19 +2870,23 @@ function DigitalTwin3D({
                 Math.sin(
                   rig.phase +
                     offset
-                ) * 0.35;
+                ) * 0.3;
             }
           );
         }
 
-        if (rig.head) {
+        if (
+          rig.head
+        ) {
           rig.head.rotation.x =
             Math.sin(
               time * 2
             ) * 0.05;
         }
 
-        if (rig.tail) {
+        if (
+          rig.tail
+        ) {
           rig.tail.rotation.z =
             Math.sin(
               time * 3
@@ -2076,15 +2908,15 @@ function DigitalTwin3D({
         );
       }
 
-      // -------------------------
-      // Flock
-      // -------------------------
-
+      // FLOCK
       if (
         mode === "flock"
       ) {
         animalMeshes.forEach(
-          (item, index) => {
+          (
+            item,
+            index
+          ) => {
             const animal =
               item.mesh;
 
@@ -2094,45 +2926,46 @@ function DigitalTwin3D({
             const rig =
               animal.userData;
 
-            const speed =
-              velocity.length();
-
-            // Random gentle movement
             velocity.x +=
               (Math.random() -
                 0.5) *
-              0.08;
+              0.06;
 
             velocity.z +=
               (Math.random() -
                 0.5) *
-              0.08;
+              0.06;
 
-            // Keep animals inside area
             const distance =
               Math.sqrt(
                 animal.position.x *
                   animal.position.x +
                   animal.position.z *
-                  animal.position.z
+                    animal.position.z
               );
 
-            if (distance > 20) {
-              velocity.add(
+            if (
+              distance > 20
+            ) {
+              const returnDirection =
                 new THREE.Vector3(
                   -animal.position.x,
                   0,
                   -animal.position.z
-                ).normalize()
+                ).normalize();
+
+              velocity.add(
+                returnDirection.multiplyScalar(
+                  0.08
+                )
               );
             }
 
             velocity.clampLength(
               0.15,
-              species ===
-                "poultry"
+              isPoultry
                 ? 1.8
-                : 1.15
+                : 1.1
             );
 
             animal.position.addScaledVector(
@@ -2141,7 +2974,8 @@ function DigitalTwin3D({
             );
 
             if (
-              speed > 0.05
+              velocity.length() >
+              0.05
             ) {
               animal.rotation.y =
                 Math.atan2(
@@ -2156,7 +2990,7 @@ function DigitalTwin3D({
             ) {
               rig.phase +=
                 delta *
-                speed *
+                velocity.length() *
                 5;
             }
 
@@ -2180,8 +3014,7 @@ function DigitalTwin3D({
                       rig.phase +
                         offset
                     ) *
-                    (species ===
-                    "poultry"
+                    (isPoultry
                       ? 0.45
                       : 0.3);
                 }
@@ -2189,8 +3022,7 @@ function DigitalTwin3D({
             }
 
             if (
-              species ===
-                "poultry" &&
+              isPoultry &&
               rig.wings
             ) {
               rig.wings[0].rotation.z =
@@ -2228,11 +3060,13 @@ function DigitalTwin3D({
       );
     };
 
-    animate();
+    animate(
+      performance.now()
+    );
 
-    // ========================================================
-    // CLICK TO MOVE INDIVIDUAL ANIMAL
-    // ========================================================
+    // --------------------------------------------------------
+    // CLICK GROUND
+    // --------------------------------------------------------
 
     const handlePointerDown =
       (event) => {
@@ -2255,23 +3089,17 @@ function DigitalTwin3D({
 
         mouseRef.current.y =
           -(
-            (event.clientY -
+            ((event.clientY -
               rect.top) /
-            rect.height
-          ) *
-            2 +
-          1;
+              rect.height) *
+              2 -
+            1
+          );
 
         raycasterRef.current.setFromCamera(
           mouseRef.current,
           camera
         );
-
-        const groundPoint =
-          new THREE.Vector3();
-
-        const ray =
-          raycasterRef.current.ray;
 
         const plane =
           new THREE.Plane(
@@ -2283,12 +3111,29 @@ function DigitalTwin3D({
             0
           );
 
+        const groundPoint =
+          new THREE.Vector3();
+
         if (
-          ray.intersectPlane(
+          raycasterRef.current.ray.intersectPlane(
             plane,
             groundPoint
           )
         ) {
+          groundPoint.x =
+            THREE.MathUtils.clamp(
+              groundPoint.x,
+              -22,
+              22
+            );
+
+          groundPoint.z =
+            THREE.MathUtils.clamp(
+              groundPoint.z,
+              -14,
+              20
+            );
+
           targetRef.current.copy(
             groundPoint
           );
@@ -2300,28 +3145,38 @@ function DigitalTwin3D({
       handlePointerDown
     );
 
-    // ========================================================
+    // --------------------------------------------------------
     // RESIZE
-    // ========================================================
+    // --------------------------------------------------------
 
     const handleResize =
       () => {
-        if (!mount) return;
+        const currentMount =
+          mountRef.current;
 
-        const width =
-          mount.clientWidth;
+        if (
+          !currentMount
+        ) {
+          return;
+        }
 
-        const height =
-          mount.clientHeight;
+        const newWidth =
+          currentMount.clientWidth ||
+          800;
+
+        const newHeight =
+          currentMount.clientHeight ||
+          520;
 
         camera.aspect =
-          width / height;
+          newWidth /
+          newHeight;
 
         camera.updateProjectionMatrix();
 
         renderer.setSize(
-          width,
-          height
+          newWidth,
+          newHeight
         );
       };
 
@@ -2332,14 +3187,22 @@ function DigitalTwin3D({
 
     handleResize();
 
-    // ========================================================
+    setCanvasReady(true);
+
+    // --------------------------------------------------------
     // CLEANUP
-    // ========================================================
+    // --------------------------------------------------------
 
     return () => {
-      cancelAnimationFrame(
+      setCanvasReady(false);
+
+      if (
         animationRef.current
-      );
+      ) {
+        cancelAnimationFrame(
+          animationRef.current
+        );
+      }
 
       window.removeEventListener(
         "resize",
@@ -2350,18 +3213,6 @@ function DigitalTwin3D({
         "pointerdown",
         handlePointerDown
       );
-
-      renderer.dispose();
-
-      if (
-        mount.contains(
-          renderer.domElement
-        )
-      ) {
-        mount.removeChild(
-          renderer.domElement
-        );
-      }
 
       scene.traverse(
         (object) => {
@@ -2389,24 +3240,46 @@ function DigitalTwin3D({
           }
         }
       );
+
+      renderer.dispose();
+
+      if (
+        mount.contains(
+          renderer.domElement
+        )
+      ) {
+        mount.removeChild(
+          renderer.domElement
+        );
+      }
+
+      rendererRef.current =
+        null;
+
+      cameraRef.current =
+        null;
     };
   }, [
     species,
     mode,
+    animalId,
   ]);
 
-  // ==========================================================
-  // UPDATE CAMERA
-  // ==========================================================
+  // ----------------------------------------------------------
+  // CAMERA
+  // ----------------------------------------------------------
 
   useEffect(() => {
     const camera =
       cameraRef.current;
 
-    if (!camera) return;
+    if (!camera) {
+      return;
+    }
 
     if (
-      mode === "individual"
+      mode ===
+      "individual"
     ) {
       camera.position.set(
         7,
@@ -2445,25 +3318,24 @@ function DigitalTwin3D({
         },
         overflow: "hidden",
         borderRadius: 2,
-        background:
+        backgroundColor:
           "#0b1220",
       }}
     >
       <Box
         ref={mountRef}
         sx={{
-          position: "absolute",
+          position:
+            "absolute",
           inset: 0,
         }}
       />
 
-      {/* =====================================================
-          TOP LEFT DIGITAL TWIN LABEL
-      ===================================================== */}
-
+      {/* TOP LEFT */}
       <Box
         sx={{
-          position: "absolute",
+          position:
+            "absolute",
           top: 16,
           left: 16,
           px: 2,
@@ -2474,7 +3346,8 @@ function DigitalTwin3D({
           color: "white",
           backdropFilter:
             "blur(8px)",
-          pointerEvents: "none",
+          pointerEvents:
+            "none",
         }}
       >
         <Typography
@@ -2483,6 +3356,8 @@ function DigitalTwin3D({
             display: "block",
             color:
               "rgba(255,255,255,0.65)",
+            letterSpacing:
+              "0.08em",
           }}
         >
           PASHUSENSE DIGITAL TWIN
@@ -2497,15 +3372,13 @@ function DigitalTwin3D({
         </Typography>
       </Box>
 
-      {/* =====================================================
-          ANIMAL TAG
-      ===================================================== */}
-
+      {/* ANIMAL ID */}
       {mode ===
         "individual" && (
         <Box
           sx={{
-            position: "absolute",
+            position:
+              "absolute",
             top: 92,
             left: "50%",
             transform:
@@ -2518,30 +3391,57 @@ function DigitalTwin3D({
             color: "white",
             fontWeight: 700,
             fontSize: 18,
-            pointerEvents: "none",
+            pointerEvents:
+              "none",
             boxShadow:
               "0 5px 20px rgba(0,0,0,0.25)",
           }}
         >
-          ANIMAL #{animalId || "1"}
+          ANIMAL #
+          {animalId || "1"}
         </Box>
       )}
 
-      {/* =====================================================
-          BOTTOM STATUS
-      ===================================================== */}
-
+      {/* READY STATUS */}
       <Box
         sx={{
-          position: "absolute",
+          position:
+            "absolute",
+          top: 16,
+          right: 16,
+          px: 1.5,
+          py: 0.7,
+          borderRadius: 2,
+          backgroundColor:
+            "rgba(15,23,42,0.82)",
+          color:
+            "#6ee7b7",
+          fontSize: 12,
+          fontWeight: 700,
+          pointerEvents:
+            "none",
+        }}
+      >
+        {canvasReady
+          ? "LIVE"
+          : "LOADING"}
+      </Box>
+
+      {/* BOTTOM */}
+      <Box
+        sx={{
+          position:
+            "absolute",
           bottom: 14,
           left: 14,
           right: 14,
           display: "flex",
           justifyContent:
             "space-between",
-          alignItems: "center",
-          pointerEvents: "none",
+          alignItems:
+            "center",
+          pointerEvents:
+            "none",
         }}
       >
         <Box
@@ -2608,8 +3508,10 @@ function DigitalTwin3D({
 // ============================================================
 
 export default function DigitalTwin() {
-  const [animals, setAnimals] =
-    useState([]);
+  const [
+    animals,
+    setAnimals,
+  ] = useState([]);
 
   const [
     selectedAnimalId,
@@ -2652,14 +3554,81 @@ export default function DigitalTwin() {
   ] = useState("");
 
   const [
-    twinSpecies,
-    setTwinSpecies,
-  ] = useState("ruminants");
-
-  const [
     twinMode,
     setTwinMode,
   ] = useState("individual");
+
+  const [mlResults, setMlResults] = useState({});
+  const [mlLoading, setMlLoading] = useState(false);
+  const [mlModels, setMlModels] = useState([]);
+  const [mlFeatures, setMlFeatures] = useState({});
+  const [mlError, setMlError] = useState("");
+
+
+  // ==========================================================
+  // LOAD STRUCTURED ML MODELS
+  // ==========================================================
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadMLModels() {
+      try {
+        const response =
+          await mlRequest("/api/ml-predictions/models");
+
+        if (!mounted) return;
+
+        const models =
+          response?.models ||
+          response?.loaded_models ||
+          response?.data?.models ||
+          response?.data ||
+          [];
+
+        if (Array.isArray(models)) {
+          const names = models
+            .map((item) =>
+              typeof item === "string"
+                ? item
+                : item?.model_name ||
+                  item?.model ||
+                  item?.name ||
+                  ""
+            )
+            .map((item) => String(item).trim())
+            .filter(Boolean);
+
+          setMlModels([
+            ...new Set(
+              names.length
+                ? names
+                : STRUCTURED_MODELS
+            ),
+          ]);
+        } else {
+          setMlModels(STRUCTURED_MODELS);
+        }
+      } catch (err) {
+        console.warn(
+          "Unable to load structured ML model list:",
+          err
+        );
+
+        if (mounted) {
+          // Keep the known backend model list visible if the
+          // endpoint is temporarily unavailable.
+          setMlModels(STRUCTURED_MODELS);
+        }
+      }
+    }
+
+    loadMLModels();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // ==========================================================
   // LOAD ANIMALS
@@ -2676,7 +3645,9 @@ export default function DigitalTwin() {
         const response =
           await getAnimals();
 
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
 
         let list = [];
 
@@ -2702,13 +3673,38 @@ export default function DigitalTwin() {
 
         setAnimals(list);
 
-        if (
-          list.length > 0
-        ) {
-          const firstId =
-            getAnimalId(
-              list[0]
+        if (list.length > 0) {
+          let firstId = getAnimalId(list[0]);
+
+          // Restore the most recent AI analysis when it belongs
+          // to an animal that still exists in the backend.
+          try {
+            const saved =
+              localStorage.getItem(
+                "pashusense_last_ai_result"
+              );
+
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              const savedId = parsed?.animalId;
+
+              const matchingAnimal = list.find(
+                (animal) =>
+                  String(getAnimalId(animal)) ===
+                  String(savedId)
+              );
+
+              if (matchingAnimal && parsed?.result) {
+                firstId = getAnimalId(matchingAnimal);
+                setAiResult(parsed.result);
+              }
+            }
+          } catch (storageError) {
+            console.warn(
+              "Unable to restore saved AI result:",
+              storageError
             );
+          }
 
           if (
             firstId !== "" &&
@@ -2726,7 +3722,9 @@ export default function DigitalTwin() {
           err
         );
 
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
 
         if (
           err?.status === 401 ||
@@ -2766,7 +3764,9 @@ export default function DigitalTwin() {
       return animals.find(
         (animal) =>
           String(
-            getAnimalId(animal)
+            getAnimalId(
+              animal
+            )
           ) ===
           String(
             selectedAnimalId
@@ -2778,7 +3778,46 @@ export default function DigitalTwin() {
     ]);
 
   // ==========================================================
-  // FILE
+  // DIGITAL TWIN SPECIES
+  // ==========================================================
+
+  const twinSpecies =
+    useMemo(() => {
+      const source =
+        selectedAnimal
+          ? getAnimalType(
+              selectedAnimal
+            )
+          : "";
+
+      const lower =
+        String(source)
+          .toLowerCase();
+
+      if (
+        lower.includes("chicken") ||
+        lower.includes("hen") ||
+        lower.includes("poultry") ||
+        lower.includes("bird")
+      ) {
+        return "poultry";
+      }
+
+      if (
+        lower.includes("cow") ||
+        lower.includes("cattle") ||
+        lower.includes("dairy")
+      ) {
+        return "dairy";
+      }
+
+      return "ruminants";
+    }, [
+      selectedAnimal,
+    ]);
+
+  // ==========================================================
+  // FILE SELECT
   // ==========================================================
 
   function handleFileChange(
@@ -2787,7 +3826,9 @@ export default function DigitalTwin() {
     const file =
       event.target.files?.[0];
 
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     if (
       !file.type.startsWith(
@@ -2808,18 +3849,22 @@ export default function DigitalTwin() {
     }
 
     const url =
-      URL.createObjectURL(file);
+      URL.createObjectURL(
+        file
+      );
 
     setSelectedFile(file);
     setPreviewUrl(url);
 
     setAiResult(null);
+    setMlResults({});
+    setMlError("");
     setError("");
     setSuccessMessage("");
   }
 
   // ==========================================================
-  // ANALYZE
+  // ANALYSE IMAGE
   // ==========================================================
 
   async function handleAnalyze() {
@@ -2845,22 +3890,75 @@ export default function DigitalTwin() {
       setSuccessMessage("");
       setAiResult(null);
 
+      // IMPORTANT:
+      // uploadAIImage accepts the image file.
+      // Animal ID remains a frontend linkage.
+      const rawResult =
+        await uploadAIImage(selectedFile);
+
       const result =
-        await uploadAIImage(
-          selectedFile,
-          selectedAnimalId
-        );
+        rawResult?.data &&
+        typeof rawResult.data === "object" &&
+        (
+          rawResult.data.analysis ||
+          rawResult.data.result ||
+          rawResult.data.yolo ||
+          rawResult.data.cnn
+        )
+          ? rawResult.data
+          : rawResult;
 
       console.log(
-        "DIGITAL TWIN AI RESPONSE:",
-        result
+        "DIGITAL TWIN AI RESPONSE FULL:",
+        JSON.stringify(result, null, 2)
       );
 
       setAiResult(result);
 
+      // Image intelligence is YOLO + CNN.
+      // Structured XGBoost/ML runs separately against the
+      // selected animal record and is never fabricated from
+      // the image response.
+      if (selectedAnimal) {
+        try {
+          await runAllStructuredModels(
+            selectedAnimal
+          );
+        } catch (mlRunError) {
+          console.error(
+            "Structured ML analysis error:",
+            mlRunError
+          );
+          setMlError(
+            mlRunError?.message ||
+              "Some structured ML models could not be run."
+          );
+        }
+      }
+
+      // Persist the latest real AI result so the Digital Twin
+      // can retain the analysis when the user navigates away
+      // and returns to this page.
+      try {
+        localStorage.setItem(
+          "pashusense_last_ai_result",
+          JSON.stringify({
+            animalId: selectedAnimalId,
+            result,
+            fileName: selectedFile.name,
+            timestamp: new Date().toISOString(),
+          })
+        );
+      } catch (storageError) {
+        console.warn(
+          "Unable to persist AI result:",
+          storageError
+        );
+      }
+
       setSuccessMessage(
         result?.message ||
-          "Animal image uploaded and analyzed successfully."
+          "Animal image analysed successfully."
       );
     } catch (err) {
       console.error(
@@ -2887,6 +3985,239 @@ export default function DigitalTwin() {
       setAnalyzing(false);
     }
   }
+
+  // ==========================================================
+  // RUN REAL STRUCTURED ML PREDICTIONS
+  // ==========================================================
+
+  async function runAllStructuredModels(animal) {
+    if (!animal) {
+      throw new Error("Please select an animal first.");
+    }
+
+    // Run only models that are applicable to the selected animal species.
+    // The backend may have 12 models loaded, but a chicken must not receive
+    // cattle/milk or pasture-model predictions.
+    const speciesKey = String(
+      getAnimalType(animal) || animal?.species || ""
+    )
+      .trim()
+      .toLowerCase()
+      .replace(/[_-]+/g, " " );
+
+    let applicableModels;
+
+    if (
+      speciesKey.includes("chicken") ||
+      speciesKey.includes("poultry") ||
+      speciesKey.includes("hen")
+    ) {
+      applicableModels = [
+        "health",
+        "egg",
+        "feed",
+        "behaviour",
+        "anomaly",
+      ];
+    } else if (
+      speciesKey.includes("cow") ||
+      speciesKey.includes("cattle") ||
+      speciesKey.includes("buffalo") ||
+      speciesKey.includes("dairy")
+    ) {
+      applicableModels = [
+        "health",
+        "feed",
+        "milk",
+        "behaviour",
+        "anomaly",
+        "milk_forecast",
+      ];
+    } else if (
+      speciesKey.includes("sheep") ||
+      speciesKey.includes("goat") ||
+      speciesKey.includes("ruminant")
+    ) {
+      applicableModels = [
+        "health",
+        "feed",
+        "behaviour",
+        "anomaly",
+        "katanning",
+        "murdoch",
+        "muresk",
+        "muresk_dry",
+        "muresk_stubble",
+      ];
+    } else {
+      // Unknown species: use only the generic models rather than producing
+      // misleading species-specific production predictions.
+      applicableModels = [
+        "health",
+        "feed",
+        "behaviour",
+        "anomaly",
+      ];
+    }
+
+    const loadedModels =
+      mlModels.length > 0
+        ? mlModels
+        : STRUCTURED_MODELS;
+
+    const modelsToRun = applicableModels.filter(
+      (modelName) => loadedModels.includes(modelName)
+    );
+
+    setMlLoading(true);
+    setMlError("");
+
+    const results = {};
+    const featureCache = {};
+
+    try {
+      for (const modelName of modelsToRun) {
+        try {
+          let featureNames =
+            mlFeatures[modelName] || [];
+
+          if (!featureNames.length) {
+            try {
+              const featureResponse =
+                await mlRequest(
+                  `/api/ml-predictions/features/${encodeURIComponent(
+                    modelName
+                  )}`
+                );
+
+              featureNames =
+                normalizeFeatureNames(
+                  featureResponse
+                );
+
+              featureCache[modelName] =
+                featureNames;
+            } catch (featureError) {
+              console.warn(
+                `Feature lookup failed for ${modelName}:`,
+                featureError
+              );
+            }
+          }
+
+          const data =
+            buildStructuredData(
+              animal,
+              modelName,
+              featureNames
+            );
+
+          const response =
+            await mlRequest(
+              "/api/ml-predictions/predict",
+              {
+                method: "POST",
+                body: JSON.stringify({
+                  model_name: modelName,
+                  data,
+                }),
+              }
+            );
+
+          const prediction =
+            extractMLPrediction(response);
+
+          results[modelName] = {
+            ...response,
+            model_name:
+              response?.model_name ||
+              modelName,
+            prediction,
+            status:
+              response?.status ||
+              (prediction !== null
+                ? "success"
+                : "no_prediction"),
+            input_features:
+              Object.keys(data),
+          };
+        } catch (modelError) {
+          console.error(
+            `ML prediction failed for ${modelName}:`,
+            modelError
+          );
+
+          results[modelName] = {
+            model_name: modelName,
+            prediction: null,
+            status: "error",
+            error:
+              modelError?.message ||
+              "Prediction failed",
+          };
+        }
+      }
+
+      setMlFeatures((previous) => ({
+        ...previous,
+        ...featureCache,
+      }));
+
+      setMlResults(results);
+
+      return results;
+    } finally {
+      setMlLoading(false);
+    }
+  }
+
+  // ==========================================================
+  // RUN ML AFTER ANIMAL SELECTION
+  // ==========================================================
+
+  useEffect(() => {
+    if (!selectedAnimal) {
+      setMlResults({});
+      return;
+    }
+
+    // Run structured models for the selected animal.
+    // This is independent of image upload.
+    let cancelled = false;
+
+    async function runForSelectedAnimal() {
+      try {
+        const results =
+          await runAllStructuredModels(
+            selectedAnimal
+          );
+
+        if (cancelled) return;
+
+        console.log(
+          "DIGITAL TWIN STRUCTURED ML RESULTS:",
+          JSON.stringify(
+            results,
+            null,
+            2
+          )
+        );
+      } catch (err) {
+        if (!cancelled) {
+          setMlError(
+            err?.message ||
+              "Structured ML analysis failed."
+          );
+        }
+      }
+    }
+
+    runForSelectedAnimal();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAnimalId]);
 
   // ==========================================================
   // PREVIEW CLEANUP
@@ -2921,8 +4252,13 @@ export default function DigitalTwin() {
       aiResult
     );
 
+  const cnnStatus =
+    getCNNStatus(
+      aiResult
+    );
+
   const cnnClassification =
-    getCNNClassification(
+    getSafeCNNClassification(
       aiResult
     );
 
@@ -2936,41 +4272,100 @@ export default function DigitalTwin() {
       aiResult
     );
 
+  const actualXGBoostPrediction =
+    getActualXGBoostPrediction(aiResult);
+
+  const xgboostAvailable =
+    getXGBoostModelAvailability(aiResult);
+
+  // Structured ML results are fetched asynchronously.
+  // IMPORTANT: define these values before anything that consumes them.
+  const behaviourML =
+    mlResults?.behaviour || null;
+
+  const healthML =
+    mlResults?.health || null;
+
+  const primaryProductionModel =
+    twinSpecies === "poultry"
+      ? "egg"
+      : twinSpecies === "dairy"
+        ? "milk"
+        : "muresk";
+
+  const primaryProductionML =
+    mlResults?.[primaryProductionModel] ||
+    null;
+
+  const structuredBehaviourPrediction =
+    extractMLPrediction(behaviourML);
+
+  const structuredHealthPrediction =
+    extractMLPrediction(healthML);
+
+  const structuredHealthLabel =
+    getHealthModelLabel(
+      structuredHealthPrediction,
+      getAnimalType(selectedAnimal)
+    );
+
+  const structuredActivity =
+    behaviourML
+      ? formatMLPrediction(
+          structuredBehaviourPrediction
+        )
+      : null;
+
   const health =
-    getHealth(aiResult);
+    structuredHealthLabel || getHealth(aiResult);
 
   const behaviour =
-    getBehaviour(aiResult);
+    structuredActivity || getBehaviour(aiResult);
 
   const activity =
-    getActivity(aiResult);
+    structuredActivity || getActivity(aiResult);
 
-  const yoloStatus =
-    aiResult?.analysis?.yolo
-      ?.status ||
-    null;
+  const structuredModelCount =
+    Object.keys(mlResults || {}).length;
 
-  const cnnStatus =
-    aiResult?.analysis?.cnn
-      ?.status ||
-    null;
-
-  const xgboostStatus =
-    aiResult?.analysis?.xgboost
-      ?.status ||
-    aiResult?.predictions
-      ?.status ||
-    null;
+  const structuredSuccessCount =
+    Object.values(mlResults || {}).filter(
+      (item) =>
+        item?.status === "success" &&
+        extractMLPrediction(item) !== null
+    ).length;
 
   // ==========================================================
-  // SPECIES SWITCH
+  // STATUS
   // ==========================================================
 
-  function changeTwinSpecies(
-    value
-  ) {
-    setTwinSpecies(value);
-  }
+  const yoloRan =
+    Boolean(aiResult);
+
+  const yoloDetected =
+    detectionCount > 0;
+
+  const yoloSpeciesIdentified =
+    Boolean(
+      detectedSpecies
+    );
+
+  const cnnRan =
+    Boolean(
+      aiResult &&
+      cnnStatus
+    );
+
+  const xgboostRan =
+    actualXGBoostPrediction !== null &&
+    actualXGBoostPrediction !== undefined ||
+    structuredSuccessCount > 0;
+
+  const cnnDisplayStatus =
+    getCNNDisplayStatus(aiResult);
+
+  const xgboostDisplayStatus =
+    getXGBoostDisplayStatus(aiResult);
 
   // ==========================================================
   // RENDER
@@ -2986,15 +4381,21 @@ export default function DigitalTwin() {
         },
       }}
     >
-      {/* ====================================================
+      {/* ======================================================
           HEADER
-      ==================================================== */}
+      ====================================================== */}
 
-      <Box sx={{ mb: 3 }}>
+      <Box
+        sx={{
+          mb: 3,
+        }}
+      >
         <Typography
           variant="h4"
           fontWeight={700}
-          sx={{ mb: 0.5 }}
+          sx={{
+            mb: 0.5,
+          }}
         >
           Digital Twin
         </Typography>
@@ -3008,14 +4409,16 @@ export default function DigitalTwin() {
         </Typography>
       </Box>
 
-      {/* ====================================================
+      {/* ======================================================
           ERROR
-      ==================================================== */}
+      ====================================================== */}
 
       {error && (
         <Alert
           severity="error"
-          sx={{ mb: 3 }}
+          sx={{
+            mb: 3,
+          }}
           onClose={() =>
             setError("")
           }
@@ -3024,14 +4427,16 @@ export default function DigitalTwin() {
         </Alert>
       )}
 
-      {/* ====================================================
+      {/* ======================================================
           SUCCESS
-      ==================================================== */}
+      ====================================================== */}
 
       {successMessage && (
         <Alert
           severity="success"
-          sx={{ mb: 3 }}
+          sx={{
+            mb: 3,
+          }}
           onClose={() =>
             setSuccessMessage("")
           }
@@ -3040,9 +4445,19 @@ export default function DigitalTwin() {
         </Alert>
       )}
 
-      {/* ====================================================
+      {mlError && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 3 }}
+          onClose={() => setMlError("")}
+        >
+          {mlError}
+        </Alert>
+      )}
+
+      {/* ======================================================
           3D DIGITAL TWIN
-      ==================================================== */}
+      ====================================================== */}
 
       <Card
         sx={{
@@ -3055,7 +4470,9 @@ export default function DigitalTwin() {
           <Typography
             variant="h6"
             fontWeight={700}
-            sx={{ mb: 0.5 }}
+            sx={{
+              mb: 0.5,
+            }}
           >
             3D Digital Twin
           </Typography>
@@ -3063,68 +4480,68 @@ export default function DigitalTwin() {
           <Typography
             variant="body2"
             color="text.secondary"
-            sx={{ mb: 2 }}
+            sx={{
+              mb: 2,
+            }}
           >
             Interactive livestock simulation
-            connected to the PashuSense animal
-            profile.
+            connected to the selected PashuSense
+            animal profile.
           </Typography>
 
-          {/* ==================================================
-              CONTROLS
-          ================================================== */}
+          {/* CONTROLS */}
 
           <Grid
             container
             spacing={2}
-            sx={{ mb: 2 }}
+            sx={{
+              mb: 2,
+            }}
           >
             <Grid
-              item
-              xs={12}
-              md={4}
+              size={{
+                xs: 12,
+                md: 4,
+              }}
             >
               <Typography
                 variant="subtitle2"
                 fontWeight={600}
-                sx={{ mb: 1 }}
+                sx={{
+                  mb: 1,
+                }}
               >
                 Species
               </Typography>
 
-              <Select
-                fullWidth
-                size="small"
-                value={twinSpecies}
-                onChange={(event) =>
-                  changeTwinSpecies(
-                    event.target.value
-                  )
-                }
+              <Box
+                sx={{
+                  border:
+                    "1px solid rgba(0,0,0,0.15)",
+                  borderRadius: 1,
+                  px: 1.5,
+                  py: 1.1,
+                  fontWeight: 600,
+                }}
               >
-                <MenuItem value="ruminants">
-                  Sheep / Ruminants
-                </MenuItem>
-
-                <MenuItem value="dairy">
-                  Dairy Cow
-                </MenuItem>
-
-                <MenuItem value="poultry">
-                  Poultry
-                </MenuItem>
-              </Select>
+                {formatSpecies(
+                  twinSpecies
+                )}
+              </Box>
             </Grid>
 
             <Grid
-              item
-              xs={12}
-              md={4}
+              size={{
+                xs: 12,
+                md: 4,
+              }}
             >
               <Typography
                 variant="subtitle2"
                 fontWeight={600}
-                sx={{ mb: 1 }}
+                sx={{
+                  mb: 1,
+                }}
               >
                 Twin Mode
               </Typography>
@@ -3133,7 +4550,9 @@ export default function DigitalTwin() {
                 fullWidth
                 size="small"
                 value={twinMode}
-                onChange={(event) =>
+                onChange={(
+                  event
+                ) =>
                   setTwinMode(
                     event.target.value
                   )
@@ -3150,37 +4569,44 @@ export default function DigitalTwin() {
             </Grid>
 
             <Grid
-              item
-              xs={12}
-              md={4}
+              size={{
+                xs: 12,
+                md: 4,
+              }}
             >
               <Typography
                 variant="subtitle2"
                 fontWeight={600}
-                sx={{ mb: 1 }}
+                sx={{
+                  mb: 1,
+                }}
               >
                 Linked Animal ID
               </Typography>
 
-              <Typography
+              <Box
                 sx={{
                   border:
                     "1px solid rgba(0,0,0,0.15)",
                   borderRadius: 1,
                   px: 1.5,
-                  py: 1,
+                  py: 1.1,
                   fontWeight: 700,
                 }}
               >
                 {selectedAnimalId ||
                   "Not selected"}
-              </Typography>
+              </Box>
             </Grid>
           </Grid>
 
           <DigitalTwin3D
-            species={twinSpecies}
-            mode={twinMode}
+            species={
+              twinSpecies
+            }
+            mode={
+              twinMode
+            }
             animalId={
               selectedAnimalId
             }
@@ -3188,9 +4614,9 @@ export default function DigitalTwin() {
         </CardContent>
       </Card>
 
-      {/* ====================================================
+      {/* ======================================================
           AI LIVESTOCK ANALYSIS
-      ==================================================== */}
+      ====================================================== */}
 
       <Card
         sx={{
@@ -3202,7 +4628,9 @@ export default function DigitalTwin() {
           <Typography
             variant="h6"
             fontWeight={700}
-            sx={{ mb: 0.5 }}
+            sx={{
+              mb: 0.5,
+            }}
           >
             AI Livestock Analysis
           </Typography>
@@ -3210,7 +4638,9 @@ export default function DigitalTwin() {
           <Typography
             variant="body2"
             color="text.secondary"
-            sx={{ mb: 3 }}
+            sx={{
+              mb: 3,
+            }}
           >
             Upload an animal image and link it
             to an existing Animal ID.
@@ -3223,14 +4653,17 @@ export default function DigitalTwin() {
             {/* LEFT */}
 
             <Grid
-              item
-              xs={12}
-              md={6}
+              size={{
+                xs: 12,
+                md: 6,
+              }}
             >
               <Typography
                 variant="subtitle2"
                 fontWeight={600}
-                sx={{ mb: 1 }}
+                sx={{
+                  mb: 1,
+                }}
               >
                 Animal Image
               </Typography>
@@ -3275,7 +4708,9 @@ export default function DigitalTwin() {
               <Typography
                 variant="subtitle2"
                 fontWeight={600}
-                sx={{ mb: 1 }}
+                sx={{
+                  mb: 1,
+                }}
               >
                 Select Animal ID
               </Typography>
@@ -3305,21 +4740,46 @@ export default function DigitalTwin() {
                     selectedAnimalId
                   }
                   displayEmpty
-                  onChange={(event) => {
-                    setSelectedAnimalId(
-                      event.target.value
-                    );
+                  onChange={(
+                    event
+                  ) => {
+                    const nextId =
+                      event.target.value;
 
-                    setAiResult(
-                      null
-                    );
-
+                    setSelectedAnimalId(nextId);
                     setError("");
-                    setSuccessMessage(
-                      ""
-                    );
+                    setSuccessMessage("");
+
+                    let restored = null;
+
+                    try {
+                      const saved =
+                        localStorage.getItem(
+                          "pashusense_last_ai_result"
+                        );
+
+                      if (saved) {
+                        const parsed = JSON.parse(saved);
+
+                        if (
+                          String(parsed?.animalId) ===
+                          String(nextId)
+                        ) {
+                          restored = parsed?.result || null;
+                        }
+                      }
+                    } catch (storageError) {
+                      console.warn(
+                        "Unable to restore animal AI result:",
+                        storageError
+                      );
+                    }
+
+                    setAiResult(restored);
                   }}
-                  sx={{ mb: 3 }}
+                  sx={{
+                    mb: 3,
+                  }}
                 >
                   <MenuItem value="">
                     Select Animal ID
@@ -3335,15 +4795,20 @@ export default function DigitalTwin() {
                       if (
                         id === "" ||
                         id === null ||
-                        id === undefined
+                        id ===
+                          undefined
                       ) {
                         return null;
                       }
 
                       return (
                         <MenuItem
-                          key={String(id)}
-                          value={String(id)}
+                          key={String(
+                            id
+                          )}
+                          value={String(
+                            id
+                          )}
                         >
                           {String(id)}
                         </MenuItem>
@@ -3403,6 +4868,20 @@ export default function DigitalTwin() {
                       selectedAnimal
                     )}
                   </Typography>
+
+                  {getAnimalWeight(
+                    selectedAnimal
+                  ) !== null && (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                    >
+                      Weight:{" "}
+                      {getAnimalWeight(
+                        selectedAnimal
+                      )} kg
+                    </Typography>
+                  )}
                 </Box>
               )}
 
@@ -3427,7 +4906,11 @@ export default function DigitalTwin() {
                   <>
                     <CircularProgress
                       size={20}
-                      sx={{ mr: 1 }}
+                      sx={{
+                        mr: 1,
+                        color:
+                          "inherit",
+                      }}
                     />
 
                     Analysing with AI...
@@ -3441,14 +4924,17 @@ export default function DigitalTwin() {
             {/* RIGHT */}
 
             <Grid
-              item
-              xs={12}
-              md={6}
+              size={{
+                xs: 12,
+                md: 6,
+              }}
             >
               <Typography
                 variant="subtitle2"
                 fontWeight={600}
-                sx={{ mb: 1 }}
+                sx={{
+                  mb: 1,
+                }}
               >
                 Preview
               </Typography>
@@ -3476,7 +4962,8 @@ export default function DigitalTwin() {
                     src={previewUrl}
                     alt="Uploaded animal"
                     sx={{
-                      width: "100%",
+                      width:
+                        "100%",
                       maxHeight: 450,
                       objectFit:
                         "contain",
@@ -3496,9 +4983,9 @@ export default function DigitalTwin() {
         </CardContent>
       </Card>
 
-      {/* ====================================================
+      {/* ======================================================
           YOLO
-      ==================================================== */}
+      ====================================================== */}
 
       <Card
         sx={{
@@ -3510,7 +4997,9 @@ export default function DigitalTwin() {
           <Typography
             variant="h6"
             fontWeight={700}
-            sx={{ mb: 0.5 }}
+            sx={{
+              mb: 0.5,
+            }}
           >
             AI Animal Identification
           </Typography>
@@ -3518,13 +5007,17 @@ export default function DigitalTwin() {
           <Typography
             variant="body2"
             color="text.secondary"
-            sx={{ mb: 3 }}
+            sx={{
+              mb: 3,
+            }}
           >
             YOLO livestock detection
           </Typography>
 
           {!aiResult ? (
-            <Typography color="text.secondary">
+            <Typography
+              color="text.secondary"
+            >
               Upload and analyse an animal image
               to see the YOLO result.
             </Typography>
@@ -3534,10 +5027,11 @@ export default function DigitalTwin() {
               spacing={2}
             >
               <Grid
-                item
-                xs={12}
-                sm={6}
-                md={3}
+                size={{
+                  xs: 12,
+                  sm: 6,
+                  md: 3,
+                }}
               >
                 <Card variant="outlined">
                   <CardContent>
@@ -3551,20 +5045,29 @@ export default function DigitalTwin() {
                     <Typography
                       variant="h6"
                       fontWeight={700}
-                      sx={{ mt: 1 }}
+                      sx={{
+                        mt: 1,
+                      }}
                     >
-                      {yoloStatus ||
-                        "Complete"}
+                      {normalizeStatus(
+                        getYOLO(
+                          aiResult
+                        )?.status
+                      ) ||
+                        (yoloDetected
+                          ? "Success"
+                          : "Completed")}
                     </Typography>
                   </CardContent>
                 </Card>
               </Grid>
 
               <Grid
-                item
-                xs={12}
-                sm={6}
-                md={3}
+                size={{
+                  xs: 12,
+                  sm: 6,
+                  md: 3,
+                }}
               >
                 <Card variant="outlined">
                   <CardContent>
@@ -3578,20 +5081,25 @@ export default function DigitalTwin() {
                     <Typography
                       variant="h6"
                       fontWeight={700}
-                      sx={{ mt: 1 }}
+                      sx={{
+                        mt: 1,
+                      }}
                     >
                       {detectedSpecies ||
-                        "No animal detected"}
+                        (yoloDetected
+                          ? "Animal detected"
+                          : "Not detected")}
                     </Typography>
                   </CardContent>
                 </Card>
               </Grid>
 
               <Grid
-                item
-                xs={12}
-                sm={6}
-                md={3}
+                size={{
+                  xs: 12,
+                  sm: 6,
+                  md: 3,
+                }}
               >
                 <Card variant="outlined">
                   <CardContent>
@@ -3605,7 +5113,9 @@ export default function DigitalTwin() {
                     <Typography
                       variant="h6"
                       fontWeight={700}
-                      sx={{ mt: 1 }}
+                      sx={{
+                        mt: 1,
+                      }}
                     >
                       {formatConfidence(
                         yoloConfidence
@@ -3616,10 +5126,11 @@ export default function DigitalTwin() {
               </Grid>
 
               <Grid
-                item
-                xs={12}
-                sm={6}
-                md={3}
+                size={{
+                  xs: 12,
+                  sm: 6,
+                  md: 3,
+                }}
               >
                 <Card variant="outlined">
                   <CardContent>
@@ -3633,7 +5144,9 @@ export default function DigitalTwin() {
                     <Typography
                       variant="h6"
                       fontWeight={700}
-                      sx={{ mt: 1 }}
+                      sx={{
+                        mt: 1,
+                      }}
                     >
                       {detectionCount}
                     </Typography>
@@ -3645,9 +5158,9 @@ export default function DigitalTwin() {
         </CardContent>
       </Card>
 
-      {/* ====================================================
-          CNN HEALTH
-      ==================================================== */}
+      {/* ======================================================
+          CNN
+      ====================================================== */}
 
       <Card
         sx={{
@@ -3659,7 +5172,9 @@ export default function DigitalTwin() {
           <Typography
             variant="h6"
             fontWeight={700}
-            sx={{ mb: 0.5 }}
+            sx={{
+              mb: 0.5,
+            }}
           >
             Health & Disease Analysis
           </Typography>
@@ -3667,13 +5182,17 @@ export default function DigitalTwin() {
           <Typography
             variant="body2"
             color="text.secondary"
-            sx={{ mb: 3 }}
+            sx={{
+              mb: 3,
+            }}
           >
             CNN image classification
           </Typography>
 
           {!aiResult ? (
-            <Typography color="text.secondary">
+            <Typography
+              color="text.secondary"
+            >
               CNN health classification will
               appear after image analysis.
             </Typography>
@@ -3684,9 +5203,10 @@ export default function DigitalTwin() {
                 spacing={2}
               >
                 <Grid
-                  item
-                  xs={12}
-                  sm={6}
+                  size={{
+                    xs: 12,
+                    sm: 6,
+                  }}
                 >
                   <Card variant="outlined">
                     <CardContent>
@@ -3700,19 +5220,21 @@ export default function DigitalTwin() {
                       <Typography
                         variant="h6"
                         fontWeight={700}
-                        sx={{ mt: 1 }}
+                        sx={{
+                          mt: 1,
+                        }}
                       >
-                        {cnnStatus ||
-                          "Complete"}
+                        {cnnDisplayStatus}
                       </Typography>
                     </CardContent>
                   </Card>
                 </Grid>
 
                 <Grid
-                  item
-                  xs={12}
-                  sm={6}
+                  size={{
+                    xs: 12,
+                    sm: 6,
+                  }}
                 >
                   <Card variant="outlined">
                     <CardContent>
@@ -3726,20 +5248,30 @@ export default function DigitalTwin() {
                       <Typography
                         variant="h6"
                         fontWeight={700}
-                        sx={{ mt: 1 }}
+                        sx={{
+                          mt: 1,
+                        }}
                       >
                         {cnnClassification
                           ? formatSpecies(
                               cnnClassification
                             )
-                          : health}
+                          : (
+                              cnnDisplayStatus ===
+                              "Low Confidence"
+                                ? "Not available"
+                                : health
+                            )}
                       </Typography>
 
                       <Typography
                         variant="body2"
                         color="text.secondary"
-                        sx={{ mt: 0.5 }}
+                        sx={{
+                          mt: 0.5,
+                        }}
                       >
+                        Confidence:{" "}
                         {formatConfidence(
                           cnnConfidence
                         )}
@@ -3749,15 +5281,41 @@ export default function DigitalTwin() {
                 </Grid>
               </Grid>
 
+              {/* LOW CONFIDENCE WARNING */}
+
+              {aiResult &&
+                cnnDisplayStatus ===
+                  "Low Confidence" && (
+                  <Alert
+                    severity="warning"
+                    sx={{
+                      mt: 2,
+                    }}
+                  >
+                    CNN confidence is low.
+                    Treat this result as
+                    an AI indication, not a
+                    confirmed diagnosis.
+                  </Alert>
+                )}
+
+              {/* TOP PREDICTIONS */}
+
               {cnnPredictions.length >
                 0 && (
-                <Box sx={{ mt: 3 }}>
+                <Box
+                  sx={{
+                    mt: 3,
+                  }}
+                >
                   <Typography
                     variant="subtitle1"
                     fontWeight={700}
-                    sx={{ mb: 1 }}
+                    sx={{
+                      mb: 1,
+                    }}
                   >
-                    Top CNN predictions
+                    Top CNN Predictions
                   </Typography>
 
                   {cnnPredictions
@@ -3768,16 +5326,22 @@ export default function DigitalTwin() {
                         index
                       ) => {
                         const label =
-                          prediction?.class ||
-                          prediction?.label ||
-                          prediction?.prediction ||
-                          prediction?.name ||
-                          "Unknown";
+                          typeof prediction ===
+                          "string"
+                            ? prediction
+                            : prediction?.class ||
+                              prediction?.label ||
+                              prediction?.prediction ||
+                              prediction?.name ||
+                              "Unknown";
 
                         const confidence =
-                          prediction?.confidence ??
-                          prediction?.probability ??
-                          prediction?.score;
+                          typeof prediction ===
+                          "object"
+                            ? prediction?.confidence ??
+                              prediction?.probability ??
+                              prediction?.score
+                            : null;
 
                         return (
                           <Box
@@ -3793,14 +5357,18 @@ export default function DigitalTwin() {
                             }}
                           >
                             <Typography>
-                              #{index + 1}{" "}
+                              #
+                              {index +
+                                1}{" "}
                               {formatSpecies(
                                 label
                               )}
                             </Typography>
 
                             <Typography
-                              fontWeight={600}
+                              fontWeight={
+                                600
+                              }
                             >
                               {formatConfidence(
                                 confidence
@@ -3817,10 +5385,9 @@ export default function DigitalTwin() {
         </CardContent>
       </Card>
 
-      {/* ====================================================
-          AI FARM ANALYSIS
-      ==================================================== */}
-
+      {/* ======================================================
+          LIVE EDGE INFERENCE
+      ====================================================== */}
       <Card
         sx={{
           mb: 3,
@@ -3833,13 +5400,69 @@ export default function DigitalTwin() {
             fontWeight={700}
             sx={{ mb: 0.5 }}
           >
+            Live Edge Inference
+          </Typography>
+
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: 2 }}
+          >
+            Latest real AI response returned by the PashuSense
+            backend. XGBoost model availability is shown separately
+            from actual structured predictions.
+          </Typography>
+
+          <Box
+            sx={{
+              p: 2,
+              borderRadius: 2,
+              backgroundColor: "#0b1220",
+              color: "#d1fae5",
+              maxHeight: 360,
+              overflow: "auto",
+              fontFamily:
+                '"Roboto Mono", "Courier New", monospace',
+              fontSize: 12,
+              lineHeight: 1.6,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {aiResult
+              ? JSON.stringify(aiResult, null, 2)
+              : "Waiting for an AI image analysis..."}
+          </Box>
+        </CardContent>
+      </Card>
+
+      {/* ======================================================
+          AI FARM ANALYSIS
+      ====================================================== */}
+
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: 2,
+        }}
+      >
+        <CardContent>
+          <Typography
+            variant="h6"
+            fontWeight={700}
+            sx={{
+              mb: 0.5,
+            }}
+          >
             AI Farm Analysis
           </Typography>
 
           <Typography
             variant="body2"
             color="text.secondary"
-            sx={{ mb: 3 }}
+            sx={{
+              mb: 3,
+            }}
           >
             Automated insights from animal
             monitoring.
@@ -3850,14 +5473,17 @@ export default function DigitalTwin() {
             spacing={3}
           >
             <Grid
-              item
-              xs={12}
-              md={4}
+              size={{
+                xs: 12,
+                md: 4,
+              }}
             >
               <Typography
                 variant="subtitle1"
                 fontWeight={700}
-                sx={{ mb: 1 }}
+                sx={{
+                  mb: 1,
+                }}
               >
                 Behaviour
               </Typography>
@@ -3866,21 +5492,28 @@ export default function DigitalTwin() {
                 variant="body2"
                 color="text.secondary"
               >
-                {aiResult
-                  ? behaviour
-                  : "Upload an image to generate AI farm insights."}
+                {behaviour !== "Not available"
+                  ? `Behaviour model: ${formatMLPrediction(
+                      structuredBehaviourPrediction
+                    )}`
+                  : aiResult
+                    ? "Behaviour model did not return a value."
+                    : "Select an animal to run Behaviour ML."}
               </Typography>
             </Grid>
 
             <Grid
-              item
-              xs={12}
-              md={4}
+              size={{
+                xs: 12,
+                md: 4,
+              }}
             >
               <Typography
                 variant="subtitle1"
                 fontWeight={700}
-                sx={{ mb: 1 }}
+                sx={{
+                  mb: 1,
+                }}
               >
                 Health
               </Typography>
@@ -3889,21 +5522,25 @@ export default function DigitalTwin() {
                 variant="body2"
                 color="text.secondary"
               >
-                {aiResult
-                  ? health
-                  : "Health analysis will appear after AI detection."}
+                {structuredHealthLabel ||
+                  (aiResult
+                    ? health
+                    : "Select an animal to run Health ML.")}
               </Typography>
             </Grid>
 
             <Grid
-              item
-              xs={12}
-              md={4}
+              size={{
+                xs: 12,
+                md: 4,
+              }}
             >
               <Typography
                 variant="subtitle1"
                 fontWeight={700}
-                sx={{ mb: 1 }}
+                sx={{
+                  mb: 1,
+                }}
               >
                 Activity
               </Typography>
@@ -3912,18 +5549,20 @@ export default function DigitalTwin() {
                 variant="body2"
                 color="text.secondary"
               >
-                {aiResult
-                  ? activity
-                  : "Activity analysis will appear after AI detection."}
+                {structuredActivity !== null
+                  ? `Activity / behaviour score: ${structuredActivity}`
+                  : aiResult
+                    ? activity
+                    : "Select an animal to run Activity ML."}
               </Typography>
             </Grid>
           </Grid>
         </CardContent>
       </Card>
 
-      {/* ====================================================
-          GROWTH
-      ==================================================== */}
+      {/* ======================================================
+          GROWTH & WEIGHT
+      ====================================================== */}
 
       <Card
         sx={{
@@ -3935,7 +5574,9 @@ export default function DigitalTwin() {
           <Typography
             variant="h6"
             fontWeight={700}
-            sx={{ mb: 0.5 }}
+            sx={{
+              mb: 0.5,
+            }}
           >
             Growth & Weight
           </Typography>
@@ -3947,20 +5588,287 @@ export default function DigitalTwin() {
             Species-specific farm intelligence
           </Typography>
 
-          <Typography
-            variant="body2"
-            sx={{ mt: 2 }}
+          <Grid
+            container
+            spacing={2}
+            sx={{
+              mt: 2,
+            }}
           >
-            Growth and weight tracking can be
-            connected to the selected animal
-            record and production models.
-          </Typography>
+            <Grid
+              size={{
+                xs: 12,
+                sm: 6,
+              }}
+            >
+              <Box
+                sx={{
+                  p: 2,
+                  border:
+                    "1px solid rgba(0,0,0,0.1)",
+                  borderRadius: 2,
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  Animal Record
+                </Typography>
+
+                <Typography
+                  fontWeight={700}
+                  sx={{
+                    mt: 0.5,
+                  }}
+                >
+                  {selectedAnimal
+                    ? "Linked"
+                    : "Not linked"}
+                </Typography>
+              </Box>
+            </Grid>
+
+            <Grid
+              size={{
+                xs: 12,
+                sm: 6,
+              }}
+            >
+              <Box
+                sx={{
+                  p: 2,
+                  border:
+                    "1px solid rgba(0,0,0,0.1)",
+                  borderRadius: 2,
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                >
+                  Current Weight
+                </Typography>
+
+                <Typography
+                  fontWeight={700}
+                  sx={{
+                    mt: 0.5,
+                  }}
+                >
+                  {getAnimalWeight(
+                    selectedAnimal
+                  ) !== null
+                    ? `${getAnimalWeight(
+                        selectedAnimal
+                      )} kg`
+                    : "Not available"}
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
         </CardContent>
       </Card>
 
-      {/* ====================================================
-          STATUS
-      ==================================================== */}
+      {/* ======================================================
+          XGBOOST / STRUCTURED ML
+      ====================================================== */}
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: 2,
+        }}
+      >
+        <CardContent>
+          <Typography
+            variant="h6"
+            fontWeight={700}
+            sx={{ mb: 0.5 }}
+          >
+            Structured ML Prediction Engine
+          </Typography>
+
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: 2 }}
+          >
+            Real predictions from the loaded PashuSense
+            structured ML models. These predictions use the
+            selected animal record and the model's required
+            feature pipeline.
+          </Typography>
+
+          <Grid container spacing={2} sx={{ mb: 2 }}>
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <Box sx={{
+                p: 2,
+                border: "1px solid rgba(0,0,0,0.1)",
+                borderRadius: 2,
+              }}>
+                <Typography variant="body2" color="text.secondary">
+                  Models available
+                </Typography>
+                <Typography fontWeight={700} sx={{ mt: 0.5 }}>
+                  {mlModels.length || xgboostAvailable || 0}
+                </Typography>
+              </Box>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <Box sx={{
+                p: 2,
+                border: "1px solid rgba(0,0,0,0.1)",
+                borderRadius: 2,
+              }}>
+                <Typography variant="body2" color="text.secondary">
+                  Predictions returned
+                </Typography>
+                <Typography fontWeight={700} sx={{ mt: 0.5 }}>
+                  {structuredSuccessCount}
+                  {mlLoading ? " • running..." : ""}
+                </Typography>
+              </Box>
+            </Grid>
+
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <Box sx={{
+                p: 2,
+                border: "1px solid rgba(0,0,0,0.1)",
+                borderRadius: 2,
+              }}>
+                <Typography variant="body2" color="text.secondary">
+                  Primary production model
+                </Typography>
+                <Typography fontWeight={700} sx={{ mt: 0.5 }}>
+                  {primaryProductionModel}
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+
+          {mlLoading && (
+            <Box sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              mb: 2,
+            }}>
+              <CircularProgress size={18} />
+              <Typography variant="body2">
+                Running structured ML models...
+              </Typography>
+            </Box>
+          )}
+
+          <Box sx={{
+            border: "1px solid rgba(0,0,0,0.1)",
+            borderRadius: 2,
+            overflow: "hidden",
+          }}>
+            {(
+              mlModels.length
+                ? mlModels
+                : STRUCTURED_MODELS
+            ).map((modelName) => {
+              const item =
+                mlResults?.[modelName];
+
+              const prediction =
+                extractMLPrediction(item);
+
+              const success =
+                item?.status === "success" &&
+                prediction !== null;
+
+              return (
+                <Box
+                  key={modelName}
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: {
+                      xs: "1fr",
+                      sm: "1.2fr 1fr 1fr",
+                    },
+                    gap: 1,
+                    p: 1.5,
+                    borderBottom:
+                      "1px solid rgba(0,0,0,0.07)",
+                  }}
+                >
+                  <Typography fontWeight={600}>
+                    {modelName}
+                  </Typography>
+
+                  <Typography variant="body2">
+                    {item
+                      ? formatMLPrediction(prediction)
+                      : mlLoading
+                        ? "Running..."
+                        : "Not run"}
+                  </Typography>
+
+                  <Typography
+                    variant="body2"
+                    color={
+                      success
+                        ? "success.main"
+                        : "text.secondary"
+                    }
+                  >
+                    {item?.status
+                      ? normalizeStatus(
+                          item.status
+                        )
+                      : "Waiting"}
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Box>
+
+          <Box sx={{
+            mt: 2,
+            p: 2,
+            borderRadius: 2,
+            backgroundColor: "rgba(0,0,0,0.03)",
+          }}>
+            <Typography variant="body2" color="text.secondary">
+              Behaviour prediction:{" "}
+              <strong>
+                {formatMLPrediction(
+                  structuredBehaviourPrediction
+                )}
+              </strong>
+            </Typography>
+
+            <Typography variant="body2" color="text.secondary">
+              Health prediction:{" "}
+              <strong>
+                {structuredHealthLabel ||
+                  formatMLPrediction(
+                    structuredHealthPrediction
+                  )}
+              </strong>
+            </Typography>
+
+            <Typography variant="body2" color="text.secondary">
+              {primaryProductionModel} prediction:{" "}
+              <strong>
+                {formatMLPrediction(
+                  extractMLPrediction(
+                    primaryProductionML
+                  )
+                )}
+              </strong>
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
+
+      {/* ======================================================
+          DIGITAL TWIN STATUS
+      ====================================================== */}
 
       <Card
         variant="outlined"
@@ -3972,21 +5880,30 @@ export default function DigitalTwin() {
           <Typography
             variant="h6"
             fontWeight={700}
-            sx={{ mb: 2 }}
+            sx={{
+              mb: 2,
+            }}
           >
             Digital Twin Status
           </Typography>
 
-          <Divider sx={{ mb: 2 }} />
+          <Divider
+            sx={{
+              mb: 2,
+            }}
+          />
 
           <Grid
             container
             spacing={2}
           >
+            {/* IMAGE */}
+
             <Grid
-              item
-              xs={12}
-              sm={6}
+              size={{
+                xs: 12,
+                sm: 6,
+              }}
             >
               <Typography
                 variant="body2"
@@ -3995,17 +5912,22 @@ export default function DigitalTwin() {
                 Animal Image
               </Typography>
 
-              <Typography fontWeight={600}>
+              <Typography
+                fontWeight={600}
+              >
                 {selectedFile
                   ? "Complete"
                   : "Pending"}
               </Typography>
             </Grid>
 
+            {/* YOLO */}
+
             <Grid
-              item
-              xs={12}
-              sm={6}
+              size={{
+                xs: 12,
+                sm: 6,
+              }}
             >
               <Typography
                 variant="body2"
@@ -4014,17 +5936,24 @@ export default function DigitalTwin() {
                 YOLO Animal Detection
               </Typography>
 
-              <Typography fontWeight={600}>
-                {yoloStatus
+              <Typography
+                fontWeight={600}
+              >
+                {!yoloRan
+                  ? "Pending"
+                  : yoloDetected
                   ? "Complete"
-                  : "Pending"}
+                  : "Completed - No animal detected"}
               </Typography>
             </Grid>
 
+            {/* SPECIES */}
+
             <Grid
-              item
-              xs={12}
-              sm={6}
+              size={{
+                xs: 12,
+                sm: 6,
+              }}
             >
               <Typography
                 variant="body2"
@@ -4033,17 +5962,26 @@ export default function DigitalTwin() {
                 Species Identification
               </Typography>
 
-              <Typography fontWeight={600}>
-                {detectedSpecies
+              <Typography
+                fontWeight={600}
+              >
+                {!aiResult
+                  ? "Pending"
+                  : yoloSpeciesIdentified
                   ? "Complete"
+                  : yoloDetected
+                  ? "Animal detected - species unavailable"
                   : "Pending"}
               </Typography>
             </Grid>
 
+            {/* CNN */}
+
             <Grid
-              item
-              xs={12}
-              sm={6}
+              size={{
+                xs: 12,
+                sm: 6,
+              }}
             >
               <Typography
                 variant="body2"
@@ -4052,17 +5990,22 @@ export default function DigitalTwin() {
                 CNN Health Analysis
               </Typography>
 
-              <Typography fontWeight={600}>
-                {cnnStatus
-                  ? "Complete"
-                  : "Pending"}
+              <Typography
+                fontWeight={600}
+              >
+                {!aiResult
+                  ? "Pending"
+                  : cnnDisplayStatus}
               </Typography>
             </Grid>
 
+            {/* PROFILE */}
+
             <Grid
-              item
-              xs={12}
-              sm={6}
+              size={{
+                xs: 12,
+                sm: 6,
+              }}
             >
               <Typography
                 variant="body2"
@@ -4071,17 +6014,22 @@ export default function DigitalTwin() {
                 Animal Profile
               </Typography>
 
-              <Typography fontWeight={600}>
+              <Typography
+                fontWeight={600}
+              >
                 {selectedAnimal
                   ? "Complete"
                   : "Pending"}
               </Typography>
             </Grid>
 
+            {/* PRODUCTION */}
+
             <Grid
-              item
-              xs={12}
-              sm={6}
+              size={{
+                xs: 12,
+                sm: 6,
+              }}
             >
               <Typography
                 variant="body2"
@@ -4090,13 +6038,19 @@ export default function DigitalTwin() {
                 Species-specific Production
               </Typography>
 
-              <Typography fontWeight={600}>
-                {xgboostStatus
-                  ? "Complete"
-                  : "Pending"}
+              <Typography
+                fontWeight={600}
+              >
+                {structuredSuccessCount > 0
+                  ? `${structuredSuccessCount} model prediction(s) available`
+                  : "Ready / Not run"}
               </Typography>
             </Grid>
           </Grid>
+
+          {/* ====================================================
+              HOW PASHUSENSE WORKS
+          ==================================================== */}
 
           <Box
             sx={{
@@ -4114,15 +6068,22 @@ export default function DigitalTwin() {
               <strong>
                 How PashuSense works:
               </strong>{" "}
-              the selected Animal ID links the
-              real farm record to the Digital Twin.
-              The uploaded image is sent to the
-              AI backend, where YOLO detects
-              livestock and CNN performs the
-              available health classification.
-              Production and farm information can
-              then be connected to the applicable
-              ML models and animal records.
+              the uploaded image is sent to the
+              real AI backend. YOLO performs
+              livestock detection and returns
+              detection information such as animal
+              count, species and confidence when
+              available. CNN performs image-based
+              classification when an animal is
+              detected and the model can produce a
+              sufficiently confident result. A
+              low-confidence CNN result should be
+              treated as an AI indication rather
+              than a confirmed diagnosis. Structured
+              XGBoost models are separate from image
+              analysis and are only marked as
+              predicted when an actual structured
+              prediction has been executed.
             </Typography>
           </Box>
         </CardContent>
